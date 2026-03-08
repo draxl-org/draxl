@@ -1,6 +1,7 @@
 # Draxl
 
-Draxl is an agent-native source model for high-volume concurrent code editing.
+Draxl is an agent-native source language for high-volume concurrent 
+deterministic code editing.
 
 It makes syntax identity, ordering, and attachment explicit in the source
 itself, so tools can apply semantic operators over stable nodes instead of
