@@ -1,0 +1,14 @@
+[package]
+name = "draxl-printer"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Canonical source printer for Draxl Source v0"
+documentation = "https://docs.rs/draxl-printer"
+homepage = "https://docs.rs/draxl-printer"
+keywords = ["printer", "formatter", "syntax", "rust", "ai"]
+categories = ["compilers", "development-tools"]
+
+[dependencies]
+draxl-ast.workspace = true

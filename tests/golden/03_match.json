@@ -1,0 +1,250 @@
+{
+  "items": [
+    {
+      "kind": "Mod",
+      "meta": {
+        "id": "m1",
+        "rank": null,
+        "anchor": null,
+        "slot": "file_items",
+        "span": {
+          "start": 0,
+          "end": 175
+        }
+      },
+      "name": "math",
+      "items": [
+        {
+          "kind": "Fn",
+          "meta": {
+            "id": "f1",
+            "rank": "a",
+            "anchor": null,
+            "slot": "items",
+            "span": {
+              "start": 17,
+              "end": 173
+            }
+          },
+          "name": "abs",
+          "params": [
+            {
+              "meta": {
+                "id": "p1",
+                "rank": "a",
+                "anchor": null,
+                "slot": "params",
+                "span": {
+                  "start": 31,
+                  "end": 48
+                }
+              },
+              "name": "x",
+              "ty": {
+                "kind": "Path",
+                "meta": {
+                  "id": "t1",
+                  "rank": null,
+                  "anchor": null,
+                  "slot": null,
+                  "span": {
+                    "start": 41,
+                    "end": 48
+                  }
+                },
+                "path": {
+                  "segments": ["i64"]
+                }
+              }
+            }
+          ],
+          "ret_ty": {
+            "kind": "Path",
+            "meta": {
+              "id": "t2",
+              "rank": null,
+              "anchor": null,
+              "slot": null,
+              "span": {
+                "start": 53,
+                "end": 60
+              }
+            },
+            "path": {
+              "segments": ["i64"]
+            }
+          },
+          "body": {
+            "kind": "Block",
+            "meta": null,
+            "stmts": [
+              {
+                "kind": "Expr",
+                "meta": {
+                  "id": "s1",
+                  "rank": "a",
+                  "anchor": null,
+                  "slot": "body",
+                  "span": {
+                    "start": 67,
+                    "end": 169
+                  }
+                },
+                "has_semi": false,
+                "expr": {
+                  "kind": "Match",
+                  "meta": {
+                    "id": "e1",
+                    "rank": null,
+                    "anchor": null,
+                    "slot": null,
+                    "span": {
+                      "start": 74,
+                      "end": 169
+                    }
+                  },
+                  "scrutinee": {
+                    "kind": "Path",
+                    "meta": {
+                      "id": "e2",
+                      "rank": null,
+                      "anchor": null,
+                      "slot": null,
+                      "span": {
+                        "start": 84,
+                        "end": 89
+                      }
+                    },
+                    "path": {
+                      "segments": ["x"]
+                    }
+                  },
+                  "arms": [
+                    {
+                      "meta": {
+                        "id": "a1",
+                        "rank": "a",
+                        "anchor": null,
+                        "slot": "arms",
+                        "span": {
+                          "start": 98,
+                          "end": 137
+                        }
+                      },
+                      "pat": {
+                        "kind": "Ident",
+                        "meta": null,
+                        "name": "n"
+                      },
+                      "guard": {
+                        "kind": "Group",
+                        "meta": {
+                          "id": "e3",
+                          "rank": null,
+                          "anchor": null,
+                          "slot": null,
+                          "span": {
+                            "start": 110,
+                            "end": 125
+                          }
+                        },
+                        "expr": {
+                          "kind": "Binary",
+                          "meta": null,
+                          "lhs": {
+                            "kind": "Path",
+                            "meta": null,
+                            "path": {
+                              "segments": ["n"]
+                            }
+                          },
+                          "op": "Lt",
+                          "rhs": {
+                            "kind": "Lit",
+                            "meta": {
+                              "id": "l1",
+                              "rank": null,
+                              "anchor": null,
+                              "slot": null,
+                              "span": {
+                                "start": 119,
+                                "end": 124
+                              }
+                            },
+                            "value": {
+                              "kind": "Int",
+                              "value": 0
+                            }
+                          }
+                        }
+                      },
+                      "body": {
+                        "kind": "Group",
+                        "meta": {
+                          "id": "e4",
+                          "rank": null,
+                          "anchor": null,
+                          "slot": null,
+                          "span": {
+                            "start": 129,
+                            "end": 137
+                          }
+                        },
+                        "expr": {
+                          "kind": "Unary",
+                          "meta": null,
+                          "op": "Neg",
+                          "expr": {
+                            "kind": "Path",
+                            "meta": null,
+                            "path": {
+                              "segments": ["n"]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "meta": {
+                        "id": "a2",
+                        "rank": "b",
+                        "anchor": null,
+                        "slot": "arms",
+                        "span": {
+                          "start": 145,
+                          "end": 162
+                        }
+                      },
+                      "pat": {
+                        "kind": "Ident",
+                        "meta": null,
+                        "name": "n"
+                      },
+                      "guard": null,
+                      "body": {
+                        "kind": "Path",
+                        "meta": {
+                          "id": "e5",
+                          "rank": null,
+                          "anchor": null,
+                          "slot": null,
+                          "span": {
+                            "start": 157,
+                            "end": 162
+                          }
+                        },
+                        "path": {
+                          "segments": ["n"]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

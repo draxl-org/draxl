@@ -1,0 +1,163 @@
+{
+  "items": [
+    {
+      "kind": "Mod",
+      "meta": {
+        "id": "m1",
+        "rank": null,
+        "anchor": null,
+        "slot": "file_items",
+        "span": {
+          "start": 0,
+          "end": 192
+        }
+      },
+      "name": "shapes",
+      "items": [
+        {
+          "kind": "Doc",
+          "meta": {
+            "id": "d1",
+            "rank": null,
+            "anchor": null,
+            "slot": "items",
+            "span": {
+              "start": 19,
+              "end": 38
+            }
+          },
+          "text": "A 2D point."
+        },
+        {
+          "kind": "Struct",
+          "meta": {
+            "id": "s1",
+            "rank": "a",
+            "anchor": null,
+            "slot": "items",
+            "span": {
+              "start": 41,
+              "end": 112
+            }
+          },
+          "name": "Point",
+          "fields": [
+            {
+              "meta": {
+                "id": "f1",
+                "rank": "a",
+                "anchor": null,
+                "slot": "fields",
+                "span": {
+                  "start": 67,
+                  "end": 84
+                }
+              },
+              "name": "x",
+              "ty": {
+                "kind": "Path",
+                "meta": {
+                  "id": "t1",
+                  "rank": null,
+                  "anchor": null,
+                  "slot": null,
+                  "span": {
+                    "start": 77,
+                    "end": 84
+                  }
+                },
+                "path": {
+                  "segments": ["i64"]
+                }
+              }
+            },
+            {
+              "meta": {
+                "id": "f2",
+                "rank": "b",
+                "anchor": null,
+                "slot": "fields",
+                "span": {
+                  "start": 90,
+                  "end": 107
+                }
+              },
+              "name": "y",
+              "ty": {
+                "kind": "Path",
+                "meta": {
+                  "id": "t2",
+                  "rank": null,
+                  "anchor": null,
+                  "slot": null,
+                  "span": {
+                    "start": 100,
+                    "end": 107
+                  }
+                },
+                "path": {
+                  "segments": ["i64"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "Enum",
+          "meta": {
+            "id": "e1",
+            "rank": "b",
+            "anchor": null,
+            "slot": "items",
+            "span": {
+              "start": 116,
+              "end": 190
+            }
+          },
+          "name": "Color",
+          "variants": [
+            {
+              "meta": {
+                "id": "v1",
+                "rank": "a",
+                "anchor": null,
+                "slot": "variants",
+                "span": {
+                  "start": 140,
+                  "end": 150
+                }
+              },
+              "name": "Red"
+            },
+            {
+              "meta": {
+                "id": "v2",
+                "rank": "b",
+                "anchor": null,
+                "slot": "variants",
+                "span": {
+                  "start": 156,
+                  "end": 168
+                }
+              },
+              "name": "Green"
+            },
+            {
+              "meta": {
+                "id": "v3",
+                "rank": "c",
+                "anchor": null,
+                "slot": "variants",
+                "span": {
+                  "start": 174,
+                  "end": 185
+                }
+              },
+              "name": "Blue"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

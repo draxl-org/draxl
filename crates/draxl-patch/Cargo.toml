@@ -1,0 +1,14 @@
+[package]
+name = "draxl-patch"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Structured patch operations over ranked Draxl slot children"
+documentation = "https://docs.rs/draxl-patch"
+homepage = "https://docs.rs/draxl-patch"
+keywords = ["patch", "ast", "refactoring", "rust", "ai"]
+categories = ["compilers", "development-tools"]
+
+[dependencies]
+draxl-ast.workspace = true

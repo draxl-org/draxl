@@ -1,0 +1,223 @@
+{
+  "items": [
+    {
+      "kind": "Mod",
+      "meta": {
+        "id": "m1",
+        "rank": null,
+        "anchor": null,
+        "slot": "file_items",
+        "span": {
+          "start": 0,
+          "end": 198
+        }
+      },
+      "name": "demo",
+      "items": [
+        {
+          "kind": "Doc",
+          "meta": {
+            "id": "d1",
+            "rank": null,
+            "anchor": null,
+            "slot": "items",
+            "span": {
+              "start": 17,
+              "end": 38
+            }
+          },
+          "text": "Add one to x."
+        },
+        {
+          "kind": "Fn",
+          "meta": {
+            "id": "f1",
+            "rank": "a",
+            "anchor": null,
+            "slot": "items",
+            "span": {
+              "start": 41,
+              "end": 196
+            }
+          },
+          "name": "add_one",
+          "params": [
+            {
+              "meta": {
+                "id": "p1",
+                "rank": "a",
+                "anchor": null,
+                "slot": "params",
+                "span": {
+                  "start": 59,
+                  "end": 76
+                }
+              },
+              "name": "x",
+              "ty": {
+                "kind": "Path",
+                "meta": {
+                  "id": "t1",
+                  "rank": null,
+                  "anchor": null,
+                  "slot": null,
+                  "span": {
+                    "start": 69,
+                    "end": 76
+                  }
+                },
+                "path": {
+                  "segments": ["i64"]
+                }
+              }
+            }
+          ],
+          "ret_ty": {
+            "kind": "Path",
+            "meta": {
+              "id": "t2",
+              "rank": null,
+              "anchor": null,
+              "slot": null,
+              "span": {
+                "start": 81,
+                "end": 88
+              }
+            },
+            "path": {
+              "segments": ["i64"]
+            }
+          },
+          "body": {
+            "kind": "Block",
+            "meta": null,
+            "stmts": [
+              {
+                "kind": "Comment",
+                "meta": {
+                  "id": "c1",
+                  "rank": null,
+                  "anchor": null,
+                  "slot": "body",
+                  "span": {
+                    "start": 95,
+                    "end": 131
+                  }
+                },
+                "text": "Cache the intermediate value."
+              },
+              {
+                "kind": "Let",
+                "meta": {
+                  "id": "s1",
+                  "rank": "a",
+                  "anchor": null,
+                  "slot": "body",
+                  "span": {
+                    "start": 136,
+                    "end": 175
+                  }
+                },
+                "pat": {
+                  "kind": "Ident",
+                  "meta": {
+                    "id": "p2",
+                    "rank": null,
+                    "anchor": null,
+                    "slot": null,
+                    "span": {
+                      "start": 147,
+                      "end": 152
+                    }
+                  },
+                  "name": "y"
+                },
+                "value": {
+                  "kind": "Group",
+                  "meta": {
+                    "id": "e1",
+                    "rank": null,
+                    "anchor": null,
+                    "slot": null,
+                    "span": {
+                      "start": 155,
+                      "end": 174
+                    }
+                  },
+                  "expr": {
+                    "kind": "Binary",
+                    "meta": {
+                      "id": "e2",
+                      "rank": null,
+                      "anchor": null,
+                      "slot": null,
+                      "span": {
+                        "start": 160,
+                        "end": 173
+                      }
+                    },
+                    "lhs": {
+                      "kind": "Path",
+                      "meta": null,
+                      "path": {
+                        "segments": ["x"]
+                      }
+                    },
+                    "op": "Add",
+                    "rhs": {
+                      "kind": "Lit",
+                      "meta": {
+                        "id": "l1",
+                        "rank": null,
+                        "anchor": null,
+                        "slot": null,
+                        "span": {
+                          "start": 168,
+                          "end": 173
+                        }
+                      },
+                      "value": {
+                        "kind": "Int",
+                        "value": 1
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "kind": "Expr",
+                "meta": {
+                  "id": "s2",
+                  "rank": "b",
+                  "anchor": null,
+                  "slot": "body",
+                  "span": {
+                    "start": 180,
+                    "end": 192
+                  }
+                },
+                "has_semi": false,
+                "expr": {
+                  "kind": "Path",
+                  "meta": {
+                    "id": "e3",
+                    "rank": null,
+                    "anchor": null,
+                    "slot": null,
+                    "span": {
+                      "start": 187,
+                      "end": 192
+                    }
+                  },
+                  "path": {
+                    "segments": ["y"]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

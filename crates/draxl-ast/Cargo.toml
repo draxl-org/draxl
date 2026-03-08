@@ -1,0 +1,14 @@
+[package]
+name = "draxl-ast"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Typed AST and metadata model for Draxl Source v0"
+documentation = "https://docs.rs/draxl-ast"
+homepage = "https://docs.rs/draxl-ast"
+keywords = ["ast", "syntax", "refactoring", "rust", "ai"]
+categories = ["compilers", "development-tools"]
+
+[lib]
+path = "src/lib.rs"

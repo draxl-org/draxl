@@ -1,0 +1,18 @@
+[package]
+name = "draxl-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Command-line interface for Draxl Source v0"
+documentation = "https://docs.rs/draxl-cli"
+homepage = "https://docs.rs/draxl-cli"
+keywords = ["cli", "parser", "refactoring", "rust", "ai"]
+categories = ["command-line-utilities", "compilers"]
+
+[[bin]]
+name = "draxl"
+path = "src/main.rs"
+
+[dependencies]
+draxl = { version = "0.1.0", path = "../.." }

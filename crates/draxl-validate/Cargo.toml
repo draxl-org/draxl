@@ -1,0 +1,14 @@
+[package]
+name = "draxl-validate"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Structural validation for Draxl Source v0 files"
+documentation = "https://docs.rs/draxl-validate"
+homepage = "https://docs.rs/draxl-validate"
+keywords = ["validation", "ast", "syntax", "rust", "ai"]
+categories = ["compilers", "development-tools"]
+
+[dependencies]
+draxl-ast.workspace = true

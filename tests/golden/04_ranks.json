@@ -1,0 +1,155 @@
+{
+  "items": [
+    {
+      "kind": "Mod",
+      "meta": {
+        "id": "m1",
+        "rank": null,
+        "anchor": null,
+        "slot": "file_items",
+        "span": {
+          "start": 0,
+          "end": 118
+        }
+      },
+      "name": "pipeline",
+      "items": [
+        {
+          "kind": "Fn",
+          "meta": {
+            "id": "f1",
+            "rank": "a",
+            "anchor": null,
+            "slot": "items",
+            "span": {
+              "start": 21,
+              "end": 116
+            }
+          },
+          "name": "run",
+          "params": [
+
+          ],
+          "ret_ty": null,
+          "body": {
+            "kind": "Block",
+            "meta": null,
+            "stmts": [
+              {
+                "kind": "Expr",
+                "meta": {
+                  "id": "s1",
+                  "rank": "a",
+                  "anchor": null,
+                  "slot": "body",
+                  "span": {
+                    "start": 43,
+                    "end": 62
+                  }
+                },
+                "has_semi": true,
+                "expr": {
+                  "kind": "Call",
+                  "meta": {
+                    "id": "e1",
+                    "rank": null,
+                    "anchor": null,
+                    "slot": null,
+                    "span": {
+                      "start": 50,
+                      "end": 61
+                    }
+                  },
+                  "callee": {
+                    "kind": "Path",
+                    "meta": null,
+                    "path": {
+                      "segments": ["fetch"]
+                    }
+                  },
+                  "args": [
+
+                  ]
+                }
+              },
+              {
+                "kind": "Expr",
+                "meta": {
+                  "id": "s2",
+                  "rank": "am",
+                  "anchor": null,
+                  "slot": "body",
+                  "span": {
+                    "start": 67,
+                    "end": 85
+                  }
+                },
+                "has_semi": true,
+                "expr": {
+                  "kind": "Call",
+                  "meta": {
+                    "id": "e2",
+                    "rank": null,
+                    "anchor": null,
+                    "slot": null,
+                    "span": {
+                      "start": 75,
+                      "end": 84
+                    }
+                  },
+                  "callee": {
+                    "kind": "Path",
+                    "meta": null,
+                    "path": {
+                      "segments": ["log"]
+                    }
+                  },
+                  "args": [
+
+                  ]
+                }
+              },
+              {
+                "kind": "Expr",
+                "meta": {
+                  "id": "s3",
+                  "rank": "b",
+                  "anchor": null,
+                  "slot": "body",
+                  "span": {
+                    "start": 90,
+                    "end": 112
+                  }
+                },
+                "has_semi": true,
+                "expr": {
+                  "kind": "Call",
+                  "meta": {
+                    "id": "e3",
+                    "rank": null,
+                    "anchor": null,
+                    "slot": null,
+                    "span": {
+                      "start": 97,
+                      "end": 111
+                    }
+                  },
+                  "callee": {
+                    "kind": "Path",
+                    "meta": null,
+                    "path": {
+                      "segments": ["validate"]
+                    }
+                  },
+                  "args": [
+
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

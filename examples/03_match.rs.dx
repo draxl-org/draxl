@@ -1,0 +1,8 @@
+@m1 mod math {
+  @f1[a] fn abs(@p1[a] x: @t1 i64) -> @t2 i64 {
+    @s1[a] @e1 match @e2 x {
+      @a1[a] n if @e3 (n < @l1 0) => @e4 (-n),
+      @a2[b] n => @e5 n,
+    }
+  }
+}

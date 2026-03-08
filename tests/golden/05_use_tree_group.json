@@ -1,0 +1,247 @@
+{
+  "items": [
+    {
+      "kind": "Mod",
+      "meta": {
+        "id": "m1",
+        "rank": null,
+        "anchor": null,
+        "slot": "file_items",
+        "span": {
+          "start": 0,
+          "end": 212
+        }
+      },
+      "name": "io",
+      "items": [
+        {
+          "kind": "Use",
+          "meta": {
+            "id": "u1",
+            "rank": "a",
+            "anchor": null,
+            "slot": "items",
+            "span": {
+              "start": 15,
+              "end": 65
+            }
+          },
+          "tree": {
+            "kind": "Path",
+            "prefix": "std",
+            "tree": {
+              "kind": "Path",
+              "prefix": "collections",
+              "tree": {
+                "kind": "Group",
+                "items": [
+                  {
+                    "kind": "Name",
+                    "name": "BTreeMap"
+                  },
+                  {
+                    "kind": "Name",
+                    "name": "BTreeSet"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "kind": "Use",
+          "meta": {
+            "id": "u2",
+            "rank": "b",
+            "anchor": null,
+            "slot": "items",
+            "span": {
+              "start": 69,
+              "end": 105
+            }
+          },
+          "tree": {
+            "kind": "Path",
+            "prefix": "crate",
+            "tree": {
+              "kind": "Path",
+              "prefix": "render",
+              "tree": {
+                "kind": "Group",
+                "items": [
+                  {
+                    "kind": "Name",
+                    "name": "self"
+                  },
+                  {
+                    "kind": "Glob"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "kind": "Fn",
+          "meta": {
+            "id": "f1",
+            "rank": "c",
+            "anchor": null,
+            "slot": "items",
+            "span": {
+              "start": 109,
+              "end": 210
+            }
+          },
+          "name": "total",
+          "params": [
+            {
+              "meta": {
+                "id": "p1",
+                "rank": "a",
+                "anchor": null,
+                "slot": "params",
+                "span": {
+                  "start": 125,
+                  "end": 142
+                }
+              },
+              "name": "x",
+              "ty": {
+                "kind": "Path",
+                "meta": {
+                  "id": "t1",
+                  "rank": null,
+                  "anchor": null,
+                  "slot": null,
+                  "span": {
+                    "start": 135,
+                    "end": 142
+                  }
+                },
+                "path": {
+                  "segments": ["i64"]
+                }
+              }
+            },
+            {
+              "meta": {
+                "id": "p2",
+                "rank": "b",
+                "anchor": null,
+                "slot": "params",
+                "span": {
+                  "start": 144,
+                  "end": 161
+                }
+              },
+              "name": "y",
+              "ty": {
+                "kind": "Path",
+                "meta": {
+                  "id": "t2",
+                  "rank": null,
+                  "anchor": null,
+                  "slot": null,
+                  "span": {
+                    "start": 154,
+                    "end": 161
+                  }
+                },
+                "path": {
+                  "segments": ["i64"]
+                }
+              }
+            }
+          ],
+          "ret_ty": {
+            "kind": "Path",
+            "meta": {
+              "id": "t3",
+              "rank": null,
+              "anchor": null,
+              "slot": null,
+              "span": {
+                "start": 166,
+                "end": 173
+              }
+            },
+            "path": {
+              "segments": ["i64"]
+            }
+          },
+          "body": {
+            "kind": "Block",
+            "meta": null,
+            "stmts": [
+              {
+                "kind": "Expr",
+                "meta": {
+                  "id": "s1",
+                  "rank": "a",
+                  "anchor": null,
+                  "slot": "body",
+                  "span": {
+                    "start": 180,
+                    "end": 206
+                  }
+                },
+                "has_semi": false,
+                "expr": {
+                  "kind": "Group",
+                  "meta": {
+                    "id": "e1",
+                    "rank": null,
+                    "anchor": null,
+                    "slot": null,
+                    "span": {
+                      "start": 187,
+                      "end": 206
+                    }
+                  },
+                  "expr": {
+                    "kind": "Binary",
+                    "meta": {
+                      "id": "e2",
+                      "rank": null,
+                      "anchor": null,
+                      "slot": null,
+                      "span": {
+                        "start": 192,
+                        "end": 205
+                      }
+                    },
+                    "lhs": {
+                      "kind": "Path",
+                      "meta": null,
+                      "path": {
+                        "segments": ["x"]
+                      }
+                    },
+                    "op": "Add",
+                    "rhs": {
+                      "kind": "Path",
+                      "meta": {
+                        "id": "e3",
+                        "rank": null,
+                        "anchor": null,
+                        "slot": null,
+                        "span": {
+                          "start": 200,
+                          "end": 205
+                        }
+                      },
+                      "path": {
+                        "segments": ["y"]
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

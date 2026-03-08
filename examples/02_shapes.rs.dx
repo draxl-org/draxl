@@ -1,0 +1,13 @@
+@m1 mod shapes {
+  @d1 /// A 2D point.
+  @s1[a] struct Point {
+    @f1[a] x: @t1 i64,
+    @f2[b] y: @t2 i64,
+  }
+
+  @e1[b] enum Color {
+    @v1[a] Red,
+    @v2[b] Green,
+    @v3[c] Blue,
+  }
+}

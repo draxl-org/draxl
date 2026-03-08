@@ -1,0 +1,14 @@
+[package]
+name = "draxl-parser"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Hand-written lexer and parser for Draxl Source v0"
+documentation = "https://docs.rs/draxl-parser"
+homepage = "https://docs.rs/draxl-parser"
+keywords = ["parser", "lexer", "syntax", "rust", "ai"]
+categories = ["compilers", "parser-implementations"]
+
+[dependencies]
+draxl-ast.workspace = true

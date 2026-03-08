@@ -1,0 +1,47 @@
+[package]
+name = "draxl"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Public facade for Draxl Source v0, an AST-native source format for agent-scale code editing"
+documentation = "https://docs.rs/draxl"
+homepage = "https://docs.rs/draxl"
+keywords = ["ast", "parser", "refactoring", "rust", "ai"]
+categories = ["compilers", "development-tools"]
+readme = "README.md"
+
+[workspace]
+members = [
+    ".",
+    "crates/draxl-ast",
+    "crates/draxl-parser",
+    "crates/draxl-printer",
+    "crates/draxl-validate",
+    "crates/draxl-lower-rust",
+    "crates/draxl-patch",
+    "crates/draxl-cli",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["rndhouse <rndhouse@protonmail.com>"]
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+draxl-ast = { version = "0.1.0", path = "crates/draxl-ast" }
+draxl-parser = { version = "0.1.0", path = "crates/draxl-parser" }
+draxl-printer = { version = "0.1.0", path = "crates/draxl-printer" }
+draxl-validate = { version = "0.1.0", path = "crates/draxl-validate" }
+draxl-lower-rust = { version = "0.1.0", path = "crates/draxl-lower-rust" }
+draxl-patch = { version = "0.1.0", path = "crates/draxl-patch" }
+
+[dependencies]
+draxl-ast.workspace = true
+draxl-parser.workspace = true
+draxl-printer.workspace = true
+draxl-validate.workspace = true
+draxl-lower-rust.workspace = true
+draxl-patch.workspace = true
