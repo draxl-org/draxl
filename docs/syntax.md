@@ -1,7 +1,7 @@
 # Syntax
 
-Draxl Source v0 is a Rust-shaped source format with explicit metadata prefixes
-on supported syntax nodes.
+Draxl Source v0 currently implements the Rust profile with explicit metadata
+prefixes on supported syntax nodes.
 
 ## Metadata prefix
 
@@ -97,7 +97,7 @@ The validator rejects:
 
 ## Supported subset
 
-The current Draxl Source v0 prototype supports:
+The current Rust profile prototype supports:
 
 - `mod`
 - `use`

@@ -4,6 +4,9 @@ Draxl is organized as a small Rust workspace rather than a single crate. The
 split is intentionally along semantic boundaries so the core data model, parser,
 printer, validator, lowering, patching, and CLI can evolve independently.
 
+The current implementation is the Rust profile over `.rs.dx` files, but the
+core source model is intended to support multiple language profiles over time.
+
 ## Data flow
 
 ```text
@@ -71,7 +74,7 @@ data model for the rest of the workspace.
 The parser crate owns the surface syntax front end:
 
 - lexing sigil metadata such as `@f1[a]->x2`
-- parsing the Rust-shaped bootstrap subset
+- parsing the bootstrap Rust profile
 - attaching metadata to typed AST nodes
 - producing structured parse errors with spans and line/column locations
 

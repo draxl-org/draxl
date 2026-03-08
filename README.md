@@ -1,10 +1,13 @@
 # Draxl
 
-Draxl is an agent-native source language with explicit syntax identity.
+Draxl is an agent-native source model for high-volume concurrent code editing.
 
-It makes syntax identity explicit with stable node IDs, ranks, anchors, and
-semantic patch operators, so tools can edit the program tree directly instead
-of patching text spans.
+It makes syntax identity, ordering, and attachment explicit in the source
+itself, so tools can apply semantic operators over stable nodes instead of
+patching text spans.
+
+This repository contains the first Draxl language profile, which targets Rust
+through `.rs.dx` files and deterministic lowering to Rust.
 
 Under the hood, Draxl is AST-native: the source carries the structure,
 identity, and attachment data that replay, merge, audit, and lowering
@@ -14,9 +17,10 @@ workflows need.
 agent edits -> semantic ops over stable ids -> validated Draxl -> canonical .rs.dx -> Rust
 ```
 
-Current Draxl source files use the target-qualified `.rs.dx` extension so the
-lowering target stays explicit. That leaves room for future backends to use
-their own `<target>.dx` suffix.
+The `.rs.dx` extension is intentional. `.dx` names the Draxl layer and `.rs`
+names the current language profile. That keeps the profile-specific surface
+distinct from the higher-level source model and leaves room for future profiles
+such as `.go.dx`, `.ts.dx`, and `.py.dx`.
 
 More detail:
 
@@ -51,7 +55,8 @@ ranked slots instead of guessing intent from lines and spans.
 - anchors make detached docs and comments attach deterministically across
   replay and merge
 - canonical printing keeps human-readable source and machine output stable
-- lowering to Rust preserves compatibility with the existing Rust toolchain
+- the current Rust profile preserves compatibility with the existing Rust
+  toolchain through deterministic lowering
 
 | Concern                | Text diffs                | Draxl                        |
 |------------------------|---------------------------|------------------------------|
@@ -82,6 +87,9 @@ source text
   -> draxl-printer / draxl-lower-rust / draxl-patch
   -> draxl facade and draxl CLI
 ```
+
+The core model is profile-agnostic. This repository currently implements the
+Rust profile and lowers validated `.rs.dx` input to Rust source.
 
 ## Semantic patching
 
@@ -187,19 +195,19 @@ mod demo {
 
 ## Current status
 
-`Draxl Source v0` currently supports a small Rust-shaped subset with parsing,
-validation, canonical formatting, JSON dumping, Rust lowering, and bootstrap
-semantic patch application.
+`Draxl Source v0` currently implements the Rust profile through `.rs.dx` files
+with parsing, validation, canonical formatting, JSON dumping, Rust lowering,
+and bootstrap semantic patch application.
 
 The current milestone supports:
 
-- parsing a narrow Draxl subset into a typed Rust-shaped IR
+- parsing the bootstrap Rust profile into a typed Draxl IR
 - validating ids, ranks, anchors, sibling attachment, and ranked-slot
   uniqueness
 - printing canonical Draxl source with deterministic ordering
 - re-parsing canonical output while preserving semantics
 - dumping deterministic JSON for the IR
-- lowering the supported subset to ordinary Rust
+- lowering the current profile to ordinary Rust
 - applying bootstrap insert/replace/delete patch ops over node ids and ranked
   slots
 
@@ -238,8 +246,10 @@ let lowered = lower_rust_source(
 
 ## Roadmap
 
-- widen the Rust-shaped subset beyond the bootstrap examples
+- widen the current Rust profile beyond the bootstrap examples
 - extend the patch model from insert/replace/delete to richer structural ops
+- add additional language profiles without changing the core identity, rank,
+  anchor, and patch model
 - harden merge-friendly workflows around stable ids, ranks, and anchors
 
 ## License
