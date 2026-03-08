@@ -29,7 +29,7 @@ fn insert_statement_into_body_respects_rank_order() {
         &mut file,
         PatchOp::Insert {
             parent: PatchParent::Node {
-                id: "f1".to_owned(),
+                id: "f4".to_owned(),
             },
             slot: "body".to_owned(),
             rank: "ah".to_owned(),

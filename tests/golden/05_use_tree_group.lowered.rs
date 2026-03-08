@@ -1,10 +1,11 @@
 mod io {
   use std::collections::{BTreeMap, BTreeSet};
 
-  use crate::render::{self, *};
+  use std::cmp::{self, *};
 
   fn total(x: i64, y: i64) -> i64 {
-    (x + y)
+    cmp::min(x, y);
+    max(x, y)
   }
 }
 

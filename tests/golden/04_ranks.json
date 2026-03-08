@@ -9,7 +9,7 @@
         "slot": "file_items",
         "span": {
           "start": 0,
-          "end": 118
+          "end": 200
         }
       },
       "name": "pipeline",
@@ -23,7 +23,82 @@
             "slot": "items",
             "span": {
               "start": 21,
-              "end": 116
+              "end": 44
+            }
+          },
+          "name": "fetch",
+          "params": [
+
+          ],
+          "ret_ty": null,
+          "body": {
+            "kind": "Block",
+            "meta": null,
+            "stmts": [
+
+            ]
+          }
+        },
+        {
+          "kind": "Fn",
+          "meta": {
+            "id": "f2",
+            "rank": "b",
+            "anchor": null,
+            "slot": "items",
+            "span": {
+              "start": 48,
+              "end": 69
+            }
+          },
+          "name": "log",
+          "params": [
+
+          ],
+          "ret_ty": null,
+          "body": {
+            "kind": "Block",
+            "meta": null,
+            "stmts": [
+
+            ]
+          }
+        },
+        {
+          "kind": "Fn",
+          "meta": {
+            "id": "f3",
+            "rank": "c",
+            "anchor": null,
+            "slot": "items",
+            "span": {
+              "start": 73,
+              "end": 99
+            }
+          },
+          "name": "validate",
+          "params": [
+
+          ],
+          "ret_ty": null,
+          "body": {
+            "kind": "Block",
+            "meta": null,
+            "stmts": [
+
+            ]
+          }
+        },
+        {
+          "kind": "Fn",
+          "meta": {
+            "id": "f4",
+            "rank": "d",
+            "anchor": null,
+            "slot": "items",
+            "span": {
+              "start": 103,
+              "end": 198
             }
           },
           "name": "run",
@@ -43,8 +118,8 @@
                   "anchor": null,
                   "slot": "body",
                   "span": {
-                    "start": 43,
-                    "end": 62
+                    "start": 125,
+                    "end": 144
                   }
                 },
                 "has_semi": true,
@@ -56,8 +131,8 @@
                     "anchor": null,
                     "slot": null,
                     "span": {
-                      "start": 50,
-                      "end": 61
+                      "start": 132,
+                      "end": 143
                     }
                   },
                   "callee": {
@@ -80,8 +155,8 @@
                   "anchor": null,
                   "slot": "body",
                   "span": {
-                    "start": 67,
-                    "end": 85
+                    "start": 149,
+                    "end": 167
                   }
                 },
                 "has_semi": true,
@@ -93,8 +168,8 @@
                     "anchor": null,
                     "slot": null,
                     "span": {
-                      "start": 75,
-                      "end": 84
+                      "start": 157,
+                      "end": 166
                     }
                   },
                   "callee": {
@@ -117,8 +192,8 @@
                   "anchor": null,
                   "slot": "body",
                   "span": {
-                    "start": 90,
-                    "end": 112
+                    "start": 172,
+                    "end": 194
                   }
                 },
                 "has_semi": true,
@@ -130,8 +205,8 @@
                     "anchor": null,
                     "slot": null,
                     "span": {
-                      "start": 97,
-                      "end": 111
+                      "start": 179,
+                      "end": 193
                     }
                   },
                   "callee": {
