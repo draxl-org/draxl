@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
-//! Public facade for Draxl Source v0, an agent-native Rust-shaped source
-//! language.
+//! Public facade for Draxl Source v0, an agent-native source language with
+//! explicit syntax identity.
 //!
 //! Draxl makes syntax identity explicit with stable node ids, ranks, anchors,
 //! and semantic patch operators so tools can edit the program tree directly

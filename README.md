@@ -1,7 +1,6 @@
 # Draxl
 
-Draxl is an agent-native, Rust-shaped source language for high-volume
-concurrent code editing.
+Draxl is an agent-native source language with explicit syntax identity.
 
 It makes syntax identity explicit with stable node IDs, ranks, anchors, and
 semantic patch operators, so tools can edit the program tree directly instead
