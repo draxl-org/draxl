@@ -1,15 +1,18 @@
 # Draxl
 
-Draxl is an AST-native source format designed for AI agents and large-scale
-concurrent code edits.
+Draxl is an agent-native, Rust-shaped source language for high-volume
+concurrent code editing.
 
-It gives syntax nodes stable identities and lets tools apply typed patch
-operators over the tree instead of line-based text diffs. The goal is cheaper
-concurrent edits, smaller merge conflicts, deterministic comment attachment,
-and stable lowering to Rust.
+It makes syntax identity explicit with stable node IDs, ranks, anchors, and
+semantic patch operators, so tools can edit the program tree directly instead
+of patching text spans.
+
+Under the hood, Draxl is AST-native: the source carries the structure,
+identity, and attachment data that replay, merge, audit, and lowering
+workflows need.
 
 ```text
-agents -> ops over @ids / slots / ranks / anchors -> validated Draxl -> canonical .rs.dx -> Rust
+agent edits -> semantic ops over stable ids -> validated Draxl -> canonical .rs.dx -> Rust
 ```
 
 Current Draxl source files use the target-qualified `.rs.dx` extension so the
@@ -24,38 +27,40 @@ More detail:
 
 ## Why now
 
-Draxl is a bet on the next software workflow.
+Draxl is a bet on a near-future software workflow.
 
-AI agents already reduce the cost of producing code. As that cost keeps falling,
-the next bottleneck becomes integration: too many parallel branches, too many
-open PRs, and too many long-lived forks maintained by machines for specific
-users, products, and deployments.
+As inference gets cheaper, code generation becomes abundant and integration
+becomes the bottleneck. Repositories will need to absorb far more
+agent-produced edits, many more concurrent branches and PRs, and long-lived
+forks maintained for specific users, products, and deployments.
 
-Traditional source files encode syntax identity by position. Tools patch byte
-ranges, infer structure heuristically, and depend on surrounding text and
-textual history. That works tolerably at low edit volume and breaks down under
-heavy concurrent change. The result is rebase churn, false conflicts, weak
-replayability, and poor control over comments, docs, and ordered inserts.
+Line-based source and text diffs are a poor fit for that environment. Byte
+ranges create false conflicts, rebase churn, and weak replayability because
+syntax identity is positional and tooling has to reconstruct structure from
+surrounding text.
 
-Draxl makes syntax identity, ordering, and attachment explicit in the source
-itself. Tools can target the program tree directly with semantic operators over
-stable node IDs, which makes edits easier to replay, merge, audit, and compose
-across diverging codebases.
+Draxl makes syntax identity explicit in the source itself. Tools can patch,
+replay, merge, and audit code semantically by addressing stable node IDs and
+ranked slots instead of guessing intent from lines and spans.
 
 ## Why Draxl
 
 - stable node ids let tools target syntax directly instead of guessing by line
   and column
-- ranks make ordered inserts explicit inside module items, params, statements,
-  and match arms
-- anchors make detached docs and comments attach deterministically
+- ranks make ordered inserts explicit, so concurrent edits do not depend on
+  textual history
+- anchors make detached docs and comments attach deterministically across
+  replay and merge
 - canonical printing keeps human-readable source and machine output stable
+- lowering to Rust preserves compatibility with the existing Rust toolchain
 
 | Concern                | Text diffs                | Draxl                        |
 |------------------------|---------------------------|------------------------------|
 | Edit target            | byte ranges, lines, spans | stable node ids              |
 | Ordered insert         | textual position          | ranked slot under a parent   |
 | Comment/doc attachment | proximity heuristics      | explicit anchors             |
+| Replay and audit       | surrounding text          | semantic ops over node ids   |
+| Branches and forks     | repeated rebase repair    | semantic replay by identity  |
 | Merge conflicts        | overlapping text          | overlapping semantic regions |
 
 ## Architecture
@@ -81,16 +86,20 @@ source text
 
 ## Semantic patching
 
-Traditional code modification is text-oriented. A tool rewrites bytes and hopes
-the patch still applies after nearby edits.
+Draxl treats semantic patch operators as first-class infrastructure for
+agent-native editing, not as a convenience wrapper around text replacement.
 
-Draxl uses semantic patch operators over stable ids and ranked slots. The
-bootstrap library already applies insert, replace, and delete over node ids and
-slot ranks today. The same addressing model is designed to support richer
-operations such as moves and explicit doc/comment attachment.
+Instead of rewriting byte ranges, a tool addresses stable node IDs and ranked
+slots. An edit can replace an expression, insert a statement, move an item,
+delete a node, or attach documentation to an explicit target.
 
-Independent edits commute when they touch different ids or slots. Conflicts
-localize to the semantic region that actually overlaps.
+That makes patches precise enough to replay across branch stacks and long-lived
+forks, merge cleanly when they touch different semantic regions, and audit at
+the level of the program tree.
+
+The bootstrap library currently implements insert, replace, and delete over
+node ids and slot ranks. The same addressing model is designed to extend to
+richer structural operators.
 
 ## Example patch ops
 
@@ -106,7 +115,7 @@ attach_doc @d2 -> @f1
 
 ## Example Draxl source
 
-```rust
+```text
 @m1 mod demo {
   @d1 /// Add one to x.
   @f1[a] fn add_one(@p1[a] x: @t1 i64) -> @t2 i64 {
@@ -233,13 +242,6 @@ let lowered = lower_rust_source(
 - widen the Rust-shaped subset beyond the bootstrap examples
 - extend the patch model from insert/replace/delete to richer structural ops
 - harden merge-friendly workflows around stable ids, ranks, and anchors
-
-## Development
-
-```bash
-make fmt
-make check
-```
 
 ## License
 

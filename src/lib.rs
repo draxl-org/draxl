@@ -1,5 +1,10 @@
 #![forbid(unsafe_code)]
-//! Public facade for Draxl Source v0.
+//! Public facade for Draxl Source v0, an agent-native Rust-shaped source
+//! language.
+//!
+//! Draxl makes syntax identity explicit with stable node ids, ranks, anchors,
+//! and semantic patch operators so tools can edit the program tree directly
+//! instead of patching text spans.
 //!
 //! This crate is the intended Rust integration surface for the workspace. It
 //! keeps the common workflows small and explicit while still re-exporting the
