@@ -6,6 +6,10 @@ The patch model operates on stable ids and named slots in the AST. That makes
 patch application resilient to surrounding formatting changes and more explicit
 about where a concurrent edit belongs.
 
+For the textual command notation used in docs and future tooling, see
+[patch-op-syntax.md](patch-op-syntax.md). This document focuses on the AST
+model and the current Rust API behavior.
+
 ## Core model
 
 The current bootstrap patch crate exposes three operations:

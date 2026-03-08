@@ -28,6 +28,7 @@ More detail:
 - [docs/architecture.md](docs/architecture.md)
 - [docs/syntax.md](docs/syntax.md)
 - [docs/patching.md](docs/patching.md)
+- [docs/patch-op-syntax.md](docs/patch-op-syntax.md)
 
 ## Why now
 
@@ -133,12 +134,12 @@ richer structural operators.
 
 ## Example patch ops
 
-Illustrative syntax:
+Canonical docs syntax:
 
 ```text
 replace_expr @e2 with (@e9 x * @l2 2)
 
-insert_stmt after @s1 rank=b: @s3[b] let @p3 z = @e4 (@e3 y + @l3 1);
+insert_stmt into @f1.body rank=b: @s3 let @p3 z = @e4 (y + @l3 1);
 
 attach_doc @d2 -> @f1
 ```
@@ -179,10 +180,10 @@ Starting block:
 @s3[b] @e3 validate();
 ```
 
-Agent A inserts a statement after `@s1` by choosing rank `ah`:
+Agent A inserts a statement into `@f1.body` with rank `ah`:
 
 ```text
-insert_stmt after @s1 rank=ah: @s4[ah] @e4 trace();
+insert_stmt into @f1.body rank=ah: @s4 @e4 trace();
 ```
 
 Agent B rewrites expression `@e2`:
