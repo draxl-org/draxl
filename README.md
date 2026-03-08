@@ -24,12 +24,23 @@ More detail:
 
 ## Why now
 
-AI agents can generate code faster than line-based collaboration tools can
-integrate it. Traditional source files make structure implicit and identity
-positional, so tools have to infer intent from byte ranges, surrounding text,
-and textual history.
+Draxl is a bet on the next software workflow.
 
-Draxl makes program structure first-class in the source itself.
+AI agents already reduce the cost of producing code. As that cost keeps falling,
+the next bottleneck becomes integration: too many parallel branches, too many
+open PRs, and too many long-lived forks maintained by machines for specific
+users, products, and deployments.
+
+Traditional source files encode syntax identity by position. Tools patch byte
+ranges, infer structure heuristically, and depend on surrounding text and
+textual history. That works tolerably at low edit volume and breaks down under
+heavy concurrent change. The result is rebase churn, false conflicts, weak
+replayability, and poor control over comments, docs, and ordered inserts.
+
+Draxl makes syntax identity, ordering, and attachment explicit in the source
+itself. Tools can target the program tree directly with semantic operators over
+stable node IDs, which makes edits easier to replay, merge, audit, and compose
+across diverging codebases.
 
 ## Why Draxl
 
@@ -40,12 +51,12 @@ Draxl makes program structure first-class in the source itself.
 - anchors make detached docs and comments attach deterministically
 - canonical printing keeps human-readable source and machine output stable
 
-| Concern | Text diffs | Draxl |
-| --- | --- | --- |
-| Edit target | byte ranges, lines, spans | stable node ids |
-| Ordered insert | textual position | ranked slot under a parent |
-| Comment/doc attachment | proximity heuristics | explicit anchors |
-| Merge conflicts | overlapping text | overlapping semantic regions |
+| Concern                | Text diffs                | Draxl                        |
+|------------------------|---------------------------|------------------------------|
+| Edit target            | byte ranges, lines, spans | stable node ids              |
+| Ordered insert         | textual position          | ranked slot under a parent   |
+| Comment/doc attachment | proximity heuristics      | explicit anchors             |
+| Merge conflicts        | overlapping text          | overlapping semantic regions |
 
 ## Architecture
 
