@@ -31,7 +31,7 @@ edition = "2021"
 authors = ["rndhouse <rndhouse@protonmail.com>"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/draxl-org/draxl"
-homepage = "https://github.com/draxl-org/draxl"
+homepage = "https://draxl.dev"
 
 [workspace.dependencies]
 draxl-ast = { version = "0.1.0", path = "crates/draxl-ast" }
