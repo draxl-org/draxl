@@ -4,9 +4,10 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 description = "Structural validation for Draxl Source v0 files"
 documentation = "https://docs.rs/draxl-validate"
-homepage = "https://docs.rs/draxl-validate"
 keywords = ["validation", "ast", "syntax", "rust", "ai"]
 categories = ["compilers", "development-tools"]
 

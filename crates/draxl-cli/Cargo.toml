@@ -4,9 +4,10 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 description = "Command-line interface for Draxl Source v0"
 documentation = "https://docs.rs/draxl-cli"
-homepage = "https://docs.rs/draxl-cli"
 keywords = ["cli", "parser", "refactoring", "rust", "ai"]
 categories = ["command-line-utilities", "compilers"]
 

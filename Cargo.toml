@@ -4,9 +4,10 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 description = "Public facade for Draxl Source v0, an AST-native source format for agent-scale code editing"
 documentation = "https://docs.rs/draxl"
-homepage = "https://docs.rs/draxl"
 keywords = ["ast", "parser", "refactoring", "rust", "ai"]
 categories = ["compilers", "development-tools"]
 readme = "README.md"
@@ -29,6 +30,8 @@ version = "0.1.0"
 edition = "2021"
 authors = ["rndhouse <rndhouse@protonmail.com>"]
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/draxl-org/draxl"
+homepage = "https://github.com/draxl-org/draxl"
 
 [workspace.dependencies]
 draxl-ast = { version = "0.1.0", path = "crates/draxl-ast" }
