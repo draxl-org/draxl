@@ -1,6 +1,6 @@
 # Draxl
 
-Draxl is an agent-native source language for high-volume concurrent 
+Draxl is an agent-native source language for high-volume concurrent
 deterministic code editing.
 
 It makes syntax identity, ordering, and attachment explicit in the source
@@ -67,6 +67,28 @@ ranked slots instead of guessing intent from lines and spans.
 | Replay and audit       | surrounding text          | semantic ops over node ids   |
 | Branches and forks     | repeated rebase repair    | semantic replay by identity  |
 | Merge conflicts        | overlapping text          | overlapping semantic regions |
+
+## Future capabilities
+
+Draxl is more than a merge-friendly source format. Stable node IDs, ranks,
+anchors, and structured annotations create room for higher-level program control
+that ordinary text files do not represent cleanly.
+
+- **Node-level ownership and policy.** Functions, types, fields, match arms, and
+  statements can carry explicit owners, required reviewers, stability levels, or
+  security policy tags. Those rules stay attached to the syntax they govern
+  instead file level scope or drifting with line edits and refactors.
+
+- **Durable review, provenance, and audit state.** Approvals, benchmark results,
+  security findings, and agent provenance can attach to specific nodes and
+  survive surrounding changes that preserve identity. Tools can then invalidate
+  evidence precisely when the underlying semantic target changes.
+
+- **Machine-readable contracts and capability summaries.** Nodes can carry
+  structured annotations for effects, resource access, unsafe boundaries, API
+  guarantees, or other higher-level constraints. That gives agents and tooling a
+  durable substrate for reasoning that is stronger than comments and cheaper
+  than re-deriving intent from raw source.
 
 ## Architecture
 
@@ -185,12 +207,12 @@ slots.
 
 ```rust
 mod demo {
-  /// Add one to x.
-  fn add_one(x: i64) -> i64 {
-    // Cache the intermediate value.
-    let y = (x + 1);
-    y
-  }
+    /// Add one to x.
+    fn add_one(x: i64) -> i64 {
+        // Cache the intermediate value.
+        let y = (x + 1);
+        y
+    }
 }
 ```
 
@@ -230,11 +252,11 @@ printer, lowering, and patch APIs.
 ```rust
 use draxl::{format_source, lower_rust_source, parse_and_validate};
 
-let file = parse_and_validate("@m1 mod demo {}")?;
-let formatted = format_source("@m1 mod demo {}")?;
+let file = parse_and_validate("@m1 mod demo {}") ?;
+let formatted = format_source("@m1 mod demo {}") ?;
 let lowered = lower_rust_source(
-    "@m1 mod demo { @f1[a] fn run() { @s1[a] @e1 work(); } }",
-)?;
+"@m1 mod demo { @f1[a] fn run() { @s1[a] @e1 work(); } }",
+) ?;
 ```
 
 ## Example corpus
