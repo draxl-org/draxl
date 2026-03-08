@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-//! Structural validation for Draxl Source v0.
+//! Structural validation for Draxl source files.
 //!
 //! Validation runs after parsing and checks the stronger invariants that make
 //! canonical printing, lowering, and patch application predictable:

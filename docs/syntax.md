@@ -1,6 +1,6 @@
 # Syntax
 
-Draxl Source v0 currently implements the Rust profile with explicit metadata
+The current Draxl Rust profile uses explicit metadata
 prefixes on supported syntax nodes.
 
 ## Metadata prefix

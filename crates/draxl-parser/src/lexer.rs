@@ -118,7 +118,7 @@ pub(crate) fn lex(source: &str) -> Result<Vec<Token>, ParseError> {
                             start: index,
                             end: index + 1,
                         },
-                        "only `//` and `///` comments are supported in Draxl Source v0",
+                        "only `//` and `///` comments are supported in the current Draxl Rust profile",
                     ));
                 }
             }
@@ -155,7 +155,7 @@ pub(crate) fn lex(source: &str) -> Result<Vec<Token>, ParseError> {
                                             end: index + 1,
                                         },
                                         &format!(
-                                            "unsupported string escape `\\{}` in Draxl Source v0",
+                                            "unsupported string escape `\\{}` in the current Draxl Rust profile",
                                             other as char
                                         ),
                                     ))
@@ -224,7 +224,7 @@ pub(crate) fn lex(source: &str) -> Result<Vec<Token>, ParseError> {
                         start: index,
                         end: index + 1,
                     },
-                    "unsupported token in Draxl Source v0",
+                    "unsupported token in the current Draxl Rust profile",
                 ));
             }
         }

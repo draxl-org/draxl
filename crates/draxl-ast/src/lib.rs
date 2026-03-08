@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-//! Typed IR for Draxl Source v0.
+//! Typed IR for Draxl.
 //!
 //! This crate defines the shared syntax model for the entire workspace:
 //!

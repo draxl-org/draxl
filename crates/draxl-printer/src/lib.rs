@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-//! Canonical printer for Draxl Source v0.
+//! Canonical printer for Draxl.
 //!
 //! This crate has two responsibilities:
 //!

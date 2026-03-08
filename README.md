@@ -196,7 +196,7 @@ mod demo {
 
 ## Current status
 
-`Draxl Source v0` currently implements the Rust profile through `.rs.dx` files
+Draxl currently implements the Rust profile through `.rs.dx` files
 with parsing, validation, canonical formatting, JSON dumping, Rust lowering,
 and bootstrap semantic patch application.
 

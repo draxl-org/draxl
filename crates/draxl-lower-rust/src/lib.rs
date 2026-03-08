@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-//! Lowering from Draxl Source v0 to ordinary Rust source.
+//! Lowering from the current Draxl Rust profile to ordinary Rust source.
 //!
 //! Lowering assumes the input already passed structural validation. The output
 //! strips Draxl metadata and preserves only the modeled Rust subset.

@@ -101,7 +101,7 @@ fn unsupported_syntax_produces_a_clear_error() {
     assert!(
         error
             .to_string()
-            .contains("unsupported token in Draxl Source v0"),
+            .contains("unsupported token in the current Draxl Rust profile"),
         "unexpected unsupported syntax error: {error}"
     );
 }

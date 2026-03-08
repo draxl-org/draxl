@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-//! Hand-written lexer and parser for Draxl Source v0.
+//! Hand-written lexer and parser for the current Draxl Rust profile.
 //!
 //! The crate is intentionally small and explicit:
 //!
