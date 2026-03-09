@@ -128,38 +128,66 @@ ranked slots instead of guessing intent from lines and spans.
 Draxl treats semantic patch operators as first-class infrastructure for
 agent-native editing, not as a convenience wrapper around text replacement.
 
-Instead of rewriting byte ranges, a tool addresses stable node IDs and ranked
-slots, single-child slots, attachment relations, and schema-defined scalar
-paths. An edit can replace a node body, insert into a ranked slot, put a new
-occupant into a single-child slot, move a node, delete a node, attach trivia,
-or update scalar fields.
+A text diff says "these bytes changed here." A Draxl patch says "replace node
+`@e2`", "insert into `@f1.body[ah]`", or "attach `@d2` to `@f1`." That is a
+better execution format for replay, merge, and audit because the patch names
+the semantic target directly instead of depending on nearby lines to rediscover
+intent.
 
-That makes patches precise enough to replay across branch stacks and long-lived
-forks, merge cleanly when they touch different semantic regions, and audit at
-the level of the program tree.
+Text diffs are good for human review, but they are a weak machine interface for
+structural edits:
 
-Today the executor exposes that model through the structured Rust API. The
-canonical textual notation used in the docs is not parsed yet.
+- nearby inserts, formatting, and unrelated rewrites can invalidate context or
+  create false conflicts
+- ordered inserts, moves, and comment attachment have to be reconstructed from
+  text layout
+- replay across branch stacks and long-lived forks depends on matching byte
+  neighborhoods, not stable program identity
+
+Draxl patch ops target the program tree itself:
+
+- replace a node body while preserving outer identity
+- insert into a ranked slot under a parent
+- put a new occupant into a single-child slot
+- move or delete a specific node
+- attach docs and comments explicitly
+- set or clear scalar fields such as names, operators, and semicolon state
+
+Same change, two representations:
+
+Text diff:
+
+```diff
+@@
+-    y
++    let z = (y + 1);
++    z
+```
+
+Semantic ops:
+
+```text
+insert @f1.body[ah]: @s3 let @p3 z = @e4 (@e6 y + @l2 1);
+
+replace @e3: @e5 z
+```
+
+The text diff relies on the exact surrounding lines. The semantic ops say what
+changed: insert a new statement into `@f1.body` and replace the expression node
+`@e3`. As long as those ids survive, the edits remain targetable through
+formatting, nearby inserts, and many refactors.
+
+The structured Rust API already uses this semantic model. The textual notation
+shown here mirrors that model, but it is not parsed by the CLI yet.
+
+The same model can also express edits that are awkward in unified diffs, such
+as `attach @d2 -> @f1`, `move @s2 -> @f1.body[ah]`, or `set @f1.name = run`.
 
 The current path-op subset is intentionally narrow. It supports scalar fields
 such as `@f1.name`, `@d1.text`, `@e7.op`, and `@s2.semi`, not arbitrary source
 text replacement.
 
 ## Concurrent edit example
-
-Canonical patch notation for future tooling (not yet executable):
-
-```text
-replace @e2: (@e2 x * @l2 2)
-
-insert @f1.body[b]: @s3 let @p3 z = @e4 (y + @l3 1);
-
-attach @d2 -> @f1
-
-set @f1.name = add_one_fast
-
-clear @d1.text
-```
 
 Starting block:
 
@@ -169,7 +197,35 @@ Starting block:
 @s3[b] @e3 validate();
 ```
 
-Agent A inserts a statement into `@f1.body` with rank `ah`:
+If two agents express their edits as text diffs, both changes land in the same
+textual neighborhood:
+
+Agent A:
+
+```diff
+@@
+ fetch();
++trace();
+ log();
+ validate();
+```
+
+Agent B:
+
+```diff
+@@
+ fetch();
+-log();
++audit();
+ validate();
+```
+
+Those diffs both depend on the same hunk around `log();`, so overlap is likely
+even though one change is an insertion and the other is a replacement.
+
+Draxl keeps the operations separate:
+
+Agent A:
 
 ```text
 insert @f1.body[ah]: @s4 @e4 trace();
@@ -190,8 +246,8 @@ Merged result:
 @s3[b] @e3 validate();
 ```
 
-The edits compose cleanly because they target different semantic nodes and
-slots.
+The edits compose cleanly because they target different semantic regions: one
+addresses the ranked body slot and the other replaces node `@e2`.
 
 ## What works today
 
