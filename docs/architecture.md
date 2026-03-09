@@ -111,12 +111,15 @@ represented by the AST.
 
 The patch crate applies structured edit operators over the AST:
 
-- insert into a slot under a parent id
-- replace a ranked child by id
-- delete a ranked child by id
+- insert into ranked slots
+- put into single-child slots
+- replace node bodies while preserving outer identity
+- delete and move removable nodes
+- attach and detach docs/comments
+- set and clear scalar fields
 
-The patch model is deliberately typed and slot-aware. It is not a generic text
-rewrite layer.
+The patch model is deliberately semantic, slot-aware, and attachment-aware. It
+is not a generic text rewrite layer.
 
 ### `draxl-cli`
 

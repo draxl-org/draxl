@@ -1,6 +1,10 @@
+mod attach;
 mod delete;
 mod insert;
+mod r#move;
+mod put;
 mod replace;
+mod set_clear;
 mod support;
 
 use crate::error::PatchError;
@@ -10,17 +14,18 @@ use draxl_ast::File;
 /// Applies a single patch operation to a file.
 pub fn apply_op(file: &mut File, op: PatchOp) -> Result<(), PatchError> {
     match op {
-        PatchOp::Insert {
-            parent,
-            slot,
-            rank,
-            node,
-        } => insert::apply_insert(file, parent, &slot, &rank, node),
+        PatchOp::Insert { dest, node } => insert::apply_insert(file, dest, node),
+        PatchOp::Put { slot, node } => put::apply_put(file, slot, node),
         PatchOp::Replace {
             target_id,
             replacement,
         } => replace::apply_replace(file, &target_id, replacement),
         PatchOp::Delete { target_id } => delete::apply_delete(file, &target_id),
+        PatchOp::Move { target_id, dest } => r#move::apply_move(file, &target_id, dest),
+        PatchOp::Set { path, value } => set_clear::apply_set(file, path, value),
+        PatchOp::Clear { path } => set_clear::apply_clear(file, path),
+        PatchOp::Attach { node_id, target_id } => attach::apply_attach(file, &node_id, &target_id),
+        PatchOp::Detach { node_id } => attach::apply_detach(file, &node_id),
     }
 }
 

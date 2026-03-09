@@ -1,32 +1,29 @@
 use super::support::{
     assign_item_slot_and_rank, assign_meta_slot_and_rank, assign_stmt_slot_and_rank, expect_field,
     expect_item, expect_match_arm, expect_param, expect_stmt, expect_variant,
+    require_insert_fragment, slot_ref_label,
 };
 use crate::error::{patch_error, PatchError};
-use crate::model::{PatchNode, PatchParent};
+use crate::model::{PatchNode, RankedDest, SlotOwner};
 use draxl_ast::{Block, Expr, File, Item, Stmt};
 
 pub(super) fn apply_insert(
     file: &mut File,
-    parent: PatchParent,
-    slot: &str,
-    rank: &str,
+    dest: RankedDest,
     node: PatchNode,
 ) -> Result<(), PatchError> {
-    let parent_label = match &parent {
-        PatchParent::File => "file".to_owned(),
-        PatchParent::Node { id } => id.clone(),
-    };
+    require_insert_fragment(&node)?;
+
     let mut node = Some(node);
-    let found = match parent {
-        PatchParent::File => {
-            insert_into_file_slot(&mut file.items, slot, rank, &mut node)?;
+    let found = match &dest.slot.owner {
+        SlotOwner::File => {
+            insert_into_file_slot(&mut file.items, &dest.slot.slot, &dest.rank, &mut node)?;
             true
         }
-        PatchParent::Node { id } => {
+        SlotOwner::Node(id) => {
             let mut found = false;
             for item in &mut file.items {
-                if insert_into_item(item, &id, slot, rank, &mut node)? {
+                if insert_into_item(item, id, &dest.slot.slot, &dest.rank, &mut node)? {
                     found = true;
                     break;
                 }
@@ -37,8 +34,8 @@ pub(super) fn apply_insert(
 
     if !found {
         return Err(patch_error(&format!(
-            "insert target for parent `{}` and slot `{}` was not found",
-            parent_label, slot
+            "insert destination `{}` was not found",
+            slot_ref_label(&dest.slot)
         )));
     }
 
@@ -47,65 +44,63 @@ pub(super) fn apply_insert(
 
 fn insert_into_file_slot(
     items: &mut Vec<Item>,
-    slot: &str,
+    public_slot: &str,
     rank: &str,
     node: &mut Option<PatchNode>,
 ) -> Result<(), PatchError> {
-    if slot != "file_items" {
+    if public_slot != "items" {
         return Err(patch_error(&format!(
-            "slot `{}` is invalid for the file root, expected `file_items`",
-            slot
+            "slot `file.{public_slot}` is invalid for ranked insertion"
         )));
     }
-    let mut item = expect_item(node.take(), slot)?;
-    assign_item_slot_and_rank(&mut item, slot, Some(rank), true)?;
+    let mut item = expect_item(node.take(), public_slot)?;
+    assign_item_slot_and_rank(&mut item, "file_items", Some(rank), true)?;
     items.push(item);
     Ok(())
 }
 
 fn insert_into_item(
     item: &mut Item,
-    parent_id: &str,
-    slot: &str,
+    owner_id: &str,
+    public_slot: &str,
     rank: &str,
     node: &mut Option<PatchNode>,
 ) -> Result<bool, PatchError> {
-    if item.meta().id == parent_id {
+    if item.meta().id == owner_id {
         match item {
-            Item::Mod(module) if slot == "items" => {
-                let mut child = expect_item(node.take(), slot)?;
-                assign_item_slot_and_rank(&mut child, slot, Some(rank), true)?;
+            Item::Mod(module) if public_slot == "items" => {
+                let mut child = expect_item(node.take(), public_slot)?;
+                assign_item_slot_and_rank(&mut child, "items", Some(rank), true)?;
                 module.items.push(child);
                 return Ok(true);
             }
-            Item::Struct(strukt) if slot == "fields" => {
-                let mut field = expect_field(node.take(), slot)?;
-                assign_meta_slot_and_rank(&mut field.meta, slot, Some(rank), true);
+            Item::Struct(strukt) if public_slot == "fields" => {
+                let mut field = expect_field(node.take(), public_slot)?;
+                assign_meta_slot_and_rank(&mut field.meta, "fields", Some(rank), true);
                 strukt.fields.push(field);
                 return Ok(true);
             }
-            Item::Enum(enm) if slot == "variants" => {
-                let mut variant = expect_variant(node.take(), slot)?;
-                assign_meta_slot_and_rank(&mut variant.meta, slot, Some(rank), true);
+            Item::Enum(enm) if public_slot == "variants" => {
+                let mut variant = expect_variant(node.take(), public_slot)?;
+                assign_meta_slot_and_rank(&mut variant.meta, "variants", Some(rank), true);
                 enm.variants.push(variant);
                 return Ok(true);
             }
-            Item::Fn(function) if slot == "params" => {
-                let mut param = expect_param(node.take(), slot)?;
-                assign_meta_slot_and_rank(&mut param.meta, slot, Some(rank), true);
+            Item::Fn(function) if public_slot == "params" => {
+                let mut param = expect_param(node.take(), public_slot)?;
+                assign_meta_slot_and_rank(&mut param.meta, "params", Some(rank), true);
                 function.params.push(param);
                 return Ok(true);
             }
-            Item::Fn(function) if slot == "body" => {
-                let mut stmt = expect_stmt(node.take(), slot)?;
-                assign_stmt_slot_and_rank(&mut stmt, slot, Some(rank), true)?;
+            Item::Fn(function) if public_slot == "body" => {
+                let mut stmt = expect_stmt(node.take(), public_slot)?;
+                assign_stmt_slot_and_rank(&mut stmt, "body", Some(rank), true)?;
                 function.body.stmts.push(stmt);
                 return Ok(true);
             }
             _ => {
                 return Err(patch_error(&format!(
-                    "slot `{}` is not available on node `{}`",
-                    slot, parent_id
+                    "slot `@{owner_id}.{public_slot}` is not available for ranked insertion"
                 )));
             }
         }
@@ -114,13 +109,13 @@ fn insert_into_item(
     match item {
         Item::Mod(module) => {
             for child in &mut module.items {
-                if insert_into_item(child, parent_id, slot, rank, node)? {
+                if insert_into_item(child, owner_id, public_slot, rank, node)? {
                     return Ok(true);
                 }
             }
         }
         Item::Fn(function) => {
-            if insert_into_block(&mut function.body, parent_id, slot, rank, node)? {
+            if insert_into_block(&mut function.body, owner_id, public_slot, rank, node)? {
                 return Ok(true);
             }
         }
@@ -132,28 +127,27 @@ fn insert_into_item(
 
 fn insert_into_block(
     block: &mut Block,
-    parent_id: &str,
-    slot: &str,
+    owner_id: &str,
+    public_slot: &str,
     rank: &str,
     node: &mut Option<PatchNode>,
 ) -> Result<bool, PatchError> {
     if let Some(meta) = &block.meta {
-        if meta.id == parent_id {
-            if slot != "body" {
+        if meta.id == owner_id {
+            if public_slot != "body" {
                 return Err(patch_error(&format!(
-                    "slot `{}` is not available on node `{}`",
-                    slot, parent_id
+                    "slot `@{owner_id}.{public_slot}` is not available for ranked insertion"
                 )));
             }
-            let mut stmt = expect_stmt(node.take(), slot)?;
-            assign_stmt_slot_and_rank(&mut stmt, slot, Some(rank), true)?;
+            let mut stmt = expect_stmt(node.take(), public_slot)?;
+            assign_stmt_slot_and_rank(&mut stmt, "body", Some(rank), true)?;
             block.stmts.push(stmt);
             return Ok(true);
         }
     }
 
     for stmt in &mut block.stmts {
-        if insert_into_stmt(stmt, parent_id, slot, rank, node)? {
+        if insert_into_stmt(stmt, owner_id, public_slot, rank, node)? {
             return Ok(true);
         }
     }
@@ -163,39 +157,48 @@ fn insert_into_block(
 
 fn insert_into_stmt(
     stmt: &mut Stmt,
-    parent_id: &str,
-    slot: &str,
+    owner_id: &str,
+    public_slot: &str,
     rank: &str,
     node: &mut Option<PatchNode>,
 ) -> Result<bool, PatchError> {
     match stmt {
-        Stmt::Let(let_stmt) => insert_into_expr(&mut let_stmt.value, parent_id, slot, rank, node),
-        Stmt::Expr(expr_stmt) => insert_into_expr(&mut expr_stmt.expr, parent_id, slot, rank, node),
-        Stmt::Item(item) => insert_into_item(item, parent_id, slot, rank, node),
+        Stmt::Let(let_stmt) => {
+            insert_into_expr(&mut let_stmt.value, owner_id, public_slot, rank, node)
+        }
+        Stmt::Expr(expr_stmt) => {
+            insert_into_expr(&mut expr_stmt.expr, owner_id, public_slot, rank, node)
+        }
+        Stmt::Item(item) => insert_into_item(item, owner_id, public_slot, rank, node),
         Stmt::Doc(_) | Stmt::Comment(_) => Ok(false),
     }
 }
 
 fn insert_into_expr(
     expr: &mut Expr,
-    parent_id: &str,
-    slot: &str,
+    owner_id: &str,
+    public_slot: &str,
     rank: &str,
     node: &mut Option<PatchNode>,
 ) -> Result<bool, PatchError> {
     if let Some(meta) = expr.meta() {
-        if meta.id == parent_id {
+        if meta.id == owner_id {
             match expr {
-                Expr::Match(match_expr) if slot == "arms" => {
-                    let mut arm = expect_match_arm(node.take(), slot)?;
-                    assign_meta_slot_and_rank(&mut arm.meta, slot, Some(rank), true);
+                Expr::Match(match_expr) if public_slot == "arms" => {
+                    let mut arm = expect_match_arm(node.take(), public_slot)?;
+                    assign_meta_slot_and_rank(&mut arm.meta, "arms", Some(rank), true);
                     match_expr.arms.push(arm);
+                    return Ok(true);
+                }
+                Expr::Block(block) if public_slot == "body" => {
+                    let mut stmt = expect_stmt(node.take(), public_slot)?;
+                    assign_stmt_slot_and_rank(&mut stmt, "body", Some(rank), true)?;
+                    block.stmts.push(stmt);
                     return Ok(true);
                 }
                 _ => {
                     return Err(patch_error(&format!(
-                        "slot `{}` is not available on node `{}`",
-                        slot, parent_id
+                        "slot `@{owner_id}.{public_slot}` is not available for ranked insertion"
                     )));
                 }
             }
@@ -203,42 +206,42 @@ fn insert_into_expr(
     }
 
     match expr {
-        Expr::Group(group) => insert_into_expr(&mut group.expr, parent_id, slot, rank, node),
+        Expr::Group(group) => insert_into_expr(&mut group.expr, owner_id, public_slot, rank, node),
         Expr::Binary(binary) => {
-            if insert_into_expr(&mut binary.lhs, parent_id, slot, rank, node)? {
+            if insert_into_expr(&mut binary.lhs, owner_id, public_slot, rank, node)? {
                 return Ok(true);
             }
-            insert_into_expr(&mut binary.rhs, parent_id, slot, rank, node)
+            insert_into_expr(&mut binary.rhs, owner_id, public_slot, rank, node)
         }
-        Expr::Unary(unary) => insert_into_expr(&mut unary.expr, parent_id, slot, rank, node),
+        Expr::Unary(unary) => insert_into_expr(&mut unary.expr, owner_id, public_slot, rank, node),
         Expr::Call(call) => {
-            if insert_into_expr(&mut call.callee, parent_id, slot, rank, node)? {
+            if insert_into_expr(&mut call.callee, owner_id, public_slot, rank, node)? {
                 return Ok(true);
             }
             for arg in &mut call.args {
-                if insert_into_expr(arg, parent_id, slot, rank, node)? {
+                if insert_into_expr(arg, owner_id, public_slot, rank, node)? {
                     return Ok(true);
                 }
             }
             Ok(false)
         }
         Expr::Match(match_expr) => {
-            if insert_into_expr(&mut match_expr.scrutinee, parent_id, slot, rank, node)? {
+            if insert_into_expr(&mut match_expr.scrutinee, owner_id, public_slot, rank, node)? {
                 return Ok(true);
             }
             for arm in &mut match_expr.arms {
                 if let Some(guard) = &mut arm.guard {
-                    if insert_into_expr(guard, parent_id, slot, rank, node)? {
+                    if insert_into_expr(guard, owner_id, public_slot, rank, node)? {
                         return Ok(true);
                     }
                 }
-                if insert_into_expr(&mut arm.body, parent_id, slot, rank, node)? {
+                if insert_into_expr(&mut arm.body, owner_id, public_slot, rank, node)? {
                     return Ok(true);
                 }
             }
             Ok(false)
         }
-        Expr::Block(block) => insert_into_block(block, parent_id, slot, rank, node),
+        Expr::Block(block) => insert_into_block(block, owner_id, public_slot, rank, node),
         Expr::Path(_) | Expr::Lit(_) => Ok(false),
     }
 }

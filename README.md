@@ -121,27 +121,28 @@ Draxl treats semantic patch operators as first-class infrastructure for
 agent-native editing, not as a convenience wrapper around text replacement.
 
 Instead of rewriting byte ranges, a tool addresses stable node IDs and ranked
-slots. An edit can replace an expression, insert a statement, move an item,
-delete a node, or attach documentation to an explicit target.
+slots, single-child slots, attachment relations, and schema-defined paths. An
+edit can replace a node body, insert into a ranked slot, put a new occupant
+into a single-child slot, move a node, delete a node, attach trivia, or update
+scalar fields.
 
 That makes patches precise enough to replay across branch stacks and long-lived
 forks, merge cleanly when they touch different semantic regions, and audit at
 the level of the program tree.
 
-The bootstrap library currently implements insert, replace, and delete over
-node ids and slot ranks. The same addressing model is designed to extend to
-richer structural operators.
+The current Rust patch API already follows that semantic split. Textual patch
+parsing for the canonical surface is still future tooling.
 
 ## Example patch ops
 
 Canonical docs syntax:
 
 ```text
-replace_expr @e2 with (@e9 x * @l2 2)
+replace @e2: (@e9 x * @l2 2)
 
-insert_stmt into @f1.body rank=b: @s3 let @p3 z = @e4 (y + @l3 1);
+insert @f1.body[b]: @s3 let @p3 z = @e4 (y + @l3 1);
 
-attach_doc @d2 -> @f1
+attach @d2 -> @f1
 ```
 
 ## Example Draxl source
@@ -183,13 +184,13 @@ Starting block:
 Agent A inserts a statement into `@f1.body` with rank `ah`:
 
 ```text
-insert_stmt into @f1.body rank=ah: @s4 @e4 trace();
+insert @f1.body[ah]: @s4 @e4 trace();
 ```
 
 Agent B rewrites expression `@e2`:
 
 ```text
-replace_expr @e2 with @e9 audit();
+replace @e2: @e9 audit();
 ```
 
 Merged result:
@@ -232,8 +233,8 @@ The current milestone supports:
 - re-parsing canonical output while preserving semantics
 - dumping deterministic JSON for the IR
 - lowering the current profile to ordinary Rust
-- applying bootstrap insert/replace/delete patch ops over node ids and ranked
-  slots
+- applying semantic patch ops over ids, schema-defined slots, attachments, and
+  scalar field paths in the current modeled subset
 
 ## Try it
 

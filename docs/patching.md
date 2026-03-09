@@ -2,107 +2,134 @@
 
 Draxl patching is structural, not textual.
 
-The patch model operates on stable ids and named slots in the AST. That makes
-patch application resilient to surrounding formatting changes and more explicit
-about where a concurrent edit belongs.
+Patch operations address stable node ids, schema-defined slot names, attachment
+relations, and scalar field paths. That makes patch application resilient to
+surrounding formatting changes and explicit about semantic intent.
 
-For the textual command notation used in docs and future tooling, see
-[patch-op-syntax.md](patch-op-syntax.md). This document focuses on the AST
+For the canonical textual notation used in docs and future tooling, see
+[patch-op-syntax.md](patch-op-syntax.md). This document focuses on the semantic
 model and the current Rust API behavior.
 
 ## Core model
 
-The current bootstrap patch crate exposes three operations:
+The public patch surface splits into four families:
 
-- `Insert`
-- `Replace`
-- `Delete`
+- node-oriented: `replace`, `delete`, `move`
+- slot-oriented: `insert`, `put`
+- relation-oriented: `attach`, `detach`
+- path-oriented: `set`, `clear`
 
-These operate over ranked slot children rather than arbitrary subtrees.
+The current Rust API mirrors that split through structured `PatchOp` values,
+`SlotRef`, `RankedDest`, `PatchDest`, `PatchPath`, and `PatchValue`.
 
-## Parent and slot addressing
+## Addressing
 
-An insertion targets:
+### Node ids
 
-- a parent selector
-- a slot name
-- a rank for the inserted child
+`@id` is a semantic locator, not a kind tag. The executor resolves the id in
+the current tree and learns the node kind from the Draxl schema plus AST
+lookup.
 
-Example parent selectors:
+### Slot refs
 
-- the file root
-- a specific node id such as `f1`
+A slot ref names a child slot owned by either the file root or a node.
 
-Example slots in the current prototype:
+Examples in the current profile:
 
-- `file_items`
-- `items`
-- `fields`
-- `variants`
-- `params`
-- `body`
-- `arms`
+- `file.items`
+- `@m1.items`
+- `@f1.params`
+- `@f1.body`
+- `@f1.ret`
+- `@let1.init`
+- `@e7.arms`
 
-## Insert
+Public slot names come from the Draxl profile. They are not required to match
+Rust struct field names used by the current implementation.
 
-Insertions create a new child inside a slot under a specific parent.
+### Paths
 
-Conceptually:
+Paths address scalar fields.
 
-```text
-insert node N into parent P slot S with rank R
-```
+Examples in the current profile:
 
-The patch layer assigns slot metadata and rank metadata to the inserted node so
-the validator and printer can treat it as a regular child.
+- `@f1.name`
+- `@d1.text`
+- `@e7.op`
+- `@s2.semi`
 
-## Replace
+## Semantics
 
-Replace swaps a ranked child identified by stable id while preserving the slot
-and rank position of the original child.
+### `replace`
 
-Conceptually:
+`replace` is node-oriented and preserves the outer shell of the target node.
 
-```text
-replace child @target with replacement node N
-```
+That means it keeps:
 
-This is useful when an agent wants to rewrite a specific function, statement,
-parameter, or match arm without rebuilding the rest of the parent container.
-
-## Delete
-
-Delete removes a ranked child identified by stable id.
+- the target id
+- the same parent owner and slot
+- the same outer rank when applicable
+- the same outer anchor metadata when applicable
+- the same inbound attachment set targeting that id
 
 Conceptually:
 
 ```text
-delete child @target
+replace keeps the node shell and rewrites the node body
 ```
 
-Deletion only applies to children in supported ranked slots.
+### `put`
 
-## Why this matters
+`put` is slot-oriented. It sets the occupant of a single-child slot, whether
+the slot was empty or already occupied.
 
-Text patches describe byte changes. Draxl patches describe semantic intent:
+If you want to preserve the existing node identity and attachment set, use
+`replace` on the occupant node instead of `put`.
 
-- which node is the parent
-- which slot receives the edit
-- which rank determines ordered placement
-- which child id is replaced or deleted
+### `move`
 
-That is a better fit for agent workflows and concurrent editing because the
-patch is expressed in terms of the tree model rather than incidental text
-layout.
+`move` preserves node identity and relocates the node to a new destination.
 
-## Current limits
+Attachments are identity-bound, not slot-bound:
 
-The current patch layer is intentionally narrow:
+- moving a node carries its attached docs/comments
+- cross-container moves rewrite attachment bookkeeping implicitly
+- moves into contexts that cannot host the attachment closure are rejected
 
-- no move operation
-- no rename-specific op
-- no generalized subtree rewrite DSL
-- only the modeled bootstrap subset is patchable
+### `attach` and `detach`
 
-Those limits are acceptable for the prototype because the point is to prove the
-identity and slot model first.
+These are first-class attachment operations. They rewrite anchor relations
+under the same sibling/container constraints that validation enforces.
+
+### `set` and `clear`
+
+These update scalar fields through schema-defined paths instead of introducing
+bespoke rename or metadata verbs.
+
+## Current implementation boundary
+
+The current executor supports the modeled Rust profile through the structured
+Rust API. The canonical textual syntax is documented, but not parsed yet.
+
+Supported today:
+
+- `insert` into ranked `items`, `fields`, `variants`, `params`, `body`, and
+  `arms` slots
+- `put` into the current modeled single-child slots such as `ret`, `ty`, `pat`,
+  `init`, `expr`, `lhs`, `rhs`, `callee`, `scrutinee`, `guard`, and arm `body`
+- `replace` of items, fields, variants, params, statements, match arms,
+  expressions, types, patterns, and attachable trivia
+- `delete` of ranked-slot children and optional single-child occupants that can
+  be removed without leaving a required slot empty
+- `move` for the same removable source regions, including attachment-closure
+  transport
+- `attach` and `detach` for doc/comment nodes
+- `set` and `clear` over the current scalar subset: names, trivia text,
+  operators, and statement semicolon state
+
+Not implemented yet:
+
+- parsing the canonical textual patch stream
+- profile metadata paths beyond the currently modeled scalar subset
+- patching over AST regions that the current Rust profile does not model with
+  stable ids or legal destination slots

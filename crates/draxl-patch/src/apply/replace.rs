@@ -1,24 +1,27 @@
 use super::support::{
-    assign_item_slot_and_rank, assign_meta_slot_and_rank, assign_stmt_slot_and_rank, expect_field,
-    expect_item, expect_match_arm, expect_param, expect_stmt, expect_variant, meta_slot_rank,
-    stmt_id, stmt_slot_rank,
+    apply_shell_to_expr, apply_shell_to_field, apply_shell_to_item, apply_shell_to_match_arm,
+    apply_shell_to_param, apply_shell_to_pattern, apply_shell_to_stmt, apply_shell_to_type,
+    apply_shell_to_variant, expect_expr, expect_field, expect_item, expect_match_arm, expect_param,
+    expect_pattern, expect_stmt, expect_type, expect_variant, expr_id, patch_node_kind,
+    require_replace_fragment, stmt_id,
 };
 use crate::error::{patch_error, PatchError};
 use crate::model::PatchNode;
-use draxl_ast::{Block, Expr, Field, File, Item, MatchArm, Param, Stmt, Variant};
+use draxl_ast::{Block, Expr, Field, File, Item, MatchArm, Param, Pattern, Stmt, Type, Variant};
 
 pub(super) fn apply_replace(
     file: &mut File,
     target_id: &str,
     replacement: PatchNode,
 ) -> Result<(), PatchError> {
+    require_replace_fragment(&replacement, target_id)?;
+
     let mut replacement = Some(replacement);
     if replace_in_items(&mut file.items, target_id, &mut replacement)? {
         Ok(())
     } else {
         Err(patch_error(&format!(
-            "replace target `{}` was not found in ranked slots",
-            target_id
+            "replace target `{target_id}` was not found"
         )))
     }
 }
@@ -48,11 +51,31 @@ fn replace_in_item(
 ) -> Result<bool, PatchError> {
     match item {
         Item::Mod(module) => replace_in_items(&mut module.items, target_id, replacement),
-        Item::Struct(strukt) => replace_field_vec(&mut strukt.fields, target_id, replacement),
+        Item::Struct(strukt) => {
+            if replace_field_vec(&mut strukt.fields, target_id, replacement)? {
+                return Ok(true);
+            }
+            for field in &mut strukt.fields {
+                if replace_in_type(&mut field.ty, target_id, replacement)? {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        }
         Item::Enum(enm) => replace_variant_vec(&mut enm.variants, target_id, replacement),
         Item::Fn(function) => {
             if replace_param_vec(&mut function.params, target_id, replacement)? {
                 return Ok(true);
+            }
+            for param in &mut function.params {
+                if replace_in_type(&mut param.ty, target_id, replacement)? {
+                    return Ok(true);
+                }
+            }
+            if let Some(ret_ty) = &mut function.ret_ty {
+                if replace_in_type(ret_ty, target_id, replacement)? {
+                    return Ok(true);
+                }
             }
             replace_in_block(&mut function.body, target_id, replacement)
         }
@@ -82,7 +105,12 @@ fn replace_in_stmt(
     replacement: &mut Option<PatchNode>,
 ) -> Result<bool, PatchError> {
     match stmt {
-        Stmt::Let(let_stmt) => replace_in_expr(&mut let_stmt.value, target_id, replacement),
+        Stmt::Let(let_stmt) => {
+            if replace_in_pattern(&mut let_stmt.pat, target_id, replacement)? {
+                return Ok(true);
+            }
+            replace_in_expr(&mut let_stmt.value, target_id, replacement)
+        }
         Stmt::Expr(expr_stmt) => replace_in_expr(&mut expr_stmt.expr, target_id, replacement),
         Stmt::Item(item) => replace_in_item(item, target_id, replacement),
         Stmt::Doc(_) | Stmt::Comment(_) => Ok(false),
@@ -94,6 +122,18 @@ fn replace_in_expr(
     target_id: &str,
     replacement: &mut Option<PatchNode>,
 ) -> Result<bool, PatchError> {
+    if expr_id(expr).is_some_and(|id| id == target_id) {
+        let shell = expr
+            .meta()
+            .cloned()
+            .ok_or_else(|| patch_error("replace target expression is missing metadata"))?;
+        let mut replacement_expr =
+            expect_expr(replacement.take(), shell.slot.as_deref().unwrap_or(""))?;
+        apply_shell_to_expr(&mut replacement_expr, &shell);
+        *expr = replacement_expr;
+        return Ok(true);
+    }
+
     match expr {
         Expr::Group(group) => replace_in_expr(&mut group.expr, target_id, replacement),
         Expr::Binary(binary) => {
@@ -122,12 +162,7 @@ fn replace_in_expr(
                 return Ok(true);
             }
             for arm in &mut match_expr.arms {
-                if let Some(guard) = &mut arm.guard {
-                    if replace_in_expr(guard, target_id, replacement)? {
-                        return Ok(true);
-                    }
-                }
-                if replace_in_expr(&mut arm.body, target_id, replacement)? {
+                if replace_in_match_arm(arm, target_id, replacement)? {
                     return Ok(true);
                 }
             }
@@ -138,6 +173,57 @@ fn replace_in_expr(
     }
 }
 
+fn replace_in_match_arm(
+    arm: &mut MatchArm,
+    target_id: &str,
+    replacement: &mut Option<PatchNode>,
+) -> Result<bool, PatchError> {
+    if replace_in_pattern(&mut arm.pat, target_id, replacement)? {
+        return Ok(true);
+    }
+    if let Some(guard) = &mut arm.guard {
+        if replace_in_expr(guard, target_id, replacement)? {
+            return Ok(true);
+        }
+    }
+    replace_in_expr(&mut arm.body, target_id, replacement)
+}
+
+fn replace_in_pattern(
+    pattern: &mut Pattern,
+    target_id: &str,
+    replacement: &mut Option<PatchNode>,
+) -> Result<bool, PatchError> {
+    if super::support::pattern_id(pattern).is_some_and(|id| id == target_id) {
+        let shell = pattern
+            .meta()
+            .cloned()
+            .ok_or_else(|| patch_error("replace target pattern is missing metadata"))?;
+        let mut replacement_pattern =
+            expect_pattern(replacement.take(), shell.slot.as_deref().unwrap_or(""))?;
+        apply_shell_to_pattern(&mut replacement_pattern, &shell);
+        *pattern = replacement_pattern;
+        return Ok(true);
+    }
+    Ok(false)
+}
+
+fn replace_in_type(
+    ty: &mut Type,
+    target_id: &str,
+    replacement: &mut Option<PatchNode>,
+) -> Result<bool, PatchError> {
+    if ty.meta().id == target_id {
+        let shell = ty.meta().clone();
+        let mut replacement_ty =
+            expect_type(replacement.take(), shell.slot.as_deref().unwrap_or(""))?;
+        apply_shell_to_type(&mut replacement_ty, &shell);
+        *ty = replacement_ty;
+        return Ok(true);
+    }
+    Ok(false)
+}
+
 fn replace_item_vec(
     items: &mut Vec<Item>,
     target_id: &str,
@@ -146,10 +232,52 @@ fn replace_item_vec(
     let Some(index) = items.iter().position(|item| item.meta().id == target_id) else {
         return Ok(false);
     };
-    let (slot, rank) = meta_slot_rank(items[index].meta());
-    let mut item = expect_item(replacement.take(), slot)?;
-    assign_item_slot_and_rank(&mut item, slot, rank.as_deref(), false)?;
-    items[index] = item;
+
+    let shell = items[index].meta().clone();
+    match &items[index] {
+        Item::Doc(_) => {
+            let slot = shell.slot.as_deref().unwrap_or("");
+            let node = replacement
+                .take()
+                .ok_or_else(|| patch_error("patch node was consumed before use"))?;
+            let mut item = match node {
+                PatchNode::Doc(doc) => Item::Doc(doc),
+                PatchNode::Comment(comment) => Item::Comment(comment),
+                other => {
+                    return Err(patch_error(&format!(
+                        "replace target `{target_id}` expects an attachment fragment, found {}",
+                        patch_node_kind(&other)
+                    )))
+                }
+            };
+            apply_shell_to_item(&mut item, &shell);
+            items[index] = item;
+            let _ = slot;
+        }
+        Item::Comment(_) => {
+            let node = replacement
+                .take()
+                .ok_or_else(|| patch_error("patch node was consumed before use"))?;
+            let mut item = match node {
+                PatchNode::Comment(comment) => Item::Comment(comment),
+                PatchNode::Doc(doc) => Item::Doc(doc),
+                other => {
+                    return Err(patch_error(&format!(
+                        "replace target `{target_id}` expects an attachment fragment, found {}",
+                        patch_node_kind(&other)
+                    )))
+                }
+            };
+            apply_shell_to_item(&mut item, &shell);
+            items[index] = item;
+        }
+        _ => {
+            let mut item = expect_item(replacement.take(), shell.slot.as_deref().unwrap_or(""))?;
+            apply_shell_to_item(&mut item, &shell);
+            items[index] = item;
+        }
+    }
+
     Ok(true)
 }
 
@@ -161,9 +289,9 @@ fn replace_field_vec(
     let Some(index) = fields.iter().position(|field| field.meta.id == target_id) else {
         return Ok(false);
     };
-    let (slot, rank) = meta_slot_rank(&fields[index].meta);
-    let mut field = expect_field(replacement.take(), slot)?;
-    assign_meta_slot_and_rank(&mut field.meta, slot, rank.as_deref(), false);
+    let shell = fields[index].meta.clone();
+    let mut field = expect_field(replacement.take(), shell.slot.as_deref().unwrap_or(""))?;
+    apply_shell_to_field(&mut field, &shell);
     fields[index] = field;
     Ok(true)
 }
@@ -179,9 +307,9 @@ fn replace_variant_vec(
     else {
         return Ok(false);
     };
-    let (slot, rank) = meta_slot_rank(&variants[index].meta);
-    let mut variant = expect_variant(replacement.take(), slot)?;
-    assign_meta_slot_and_rank(&mut variant.meta, slot, rank.as_deref(), false);
+    let shell = variants[index].meta.clone();
+    let mut variant = expect_variant(replacement.take(), shell.slot.as_deref().unwrap_or(""))?;
+    apply_shell_to_variant(&mut variant, &shell);
     variants[index] = variant;
     Ok(true)
 }
@@ -194,9 +322,9 @@ fn replace_param_vec(
     let Some(index) = params.iter().position(|param| param.meta.id == target_id) else {
         return Ok(false);
     };
-    let (slot, rank) = meta_slot_rank(&params[index].meta);
-    let mut param = expect_param(replacement.take(), slot)?;
-    assign_meta_slot_and_rank(&mut param.meta, slot, rank.as_deref(), false);
+    let shell = params[index].meta.clone();
+    let mut param = expect_param(replacement.take(), shell.slot.as_deref().unwrap_or(""))?;
+    apply_shell_to_param(&mut param, &shell);
     params[index] = param;
     Ok(true)
 }
@@ -212,10 +340,53 @@ fn replace_stmt_vec(
     else {
         return Ok(false);
     };
-    let (slot, rank) = stmt_slot_rank(&stmts[index])?;
-    let mut stmt = expect_stmt(replacement.take(), slot)?;
-    assign_stmt_slot_and_rank(&mut stmt, slot, rank.as_deref(), false)?;
-    stmts[index] = stmt;
+
+    let shell = stmts[index]
+        .meta()
+        .cloned()
+        .ok_or_else(|| patch_error("replace target statement is missing metadata"))?;
+    match &stmts[index] {
+        Stmt::Doc(_) => {
+            let node = replacement
+                .take()
+                .ok_or_else(|| patch_error("patch node was consumed before use"))?;
+            let mut stmt = match node {
+                PatchNode::Doc(doc) => Stmt::Doc(doc),
+                PatchNode::Comment(comment) => Stmt::Comment(comment),
+                other => {
+                    return Err(patch_error(&format!(
+                        "replace target `{target_id}` expects an attachment fragment, found {}",
+                        patch_node_kind(&other)
+                    )))
+                }
+            };
+            apply_shell_to_stmt(&mut stmt, &shell);
+            stmts[index] = stmt;
+        }
+        Stmt::Comment(_) => {
+            let node = replacement
+                .take()
+                .ok_or_else(|| patch_error("patch node was consumed before use"))?;
+            let mut stmt = match node {
+                PatchNode::Comment(comment) => Stmt::Comment(comment),
+                PatchNode::Doc(doc) => Stmt::Doc(doc),
+                other => {
+                    return Err(patch_error(&format!(
+                        "replace target `{target_id}` expects an attachment fragment, found {}",
+                        patch_node_kind(&other)
+                    )))
+                }
+            };
+            apply_shell_to_stmt(&mut stmt, &shell);
+            stmts[index] = stmt;
+        }
+        _ => {
+            let mut stmt = expect_stmt(replacement.take(), shell.slot.as_deref().unwrap_or(""))?;
+            apply_shell_to_stmt(&mut stmt, &shell);
+            stmts[index] = stmt;
+        }
+    }
+
     Ok(true)
 }
 
@@ -227,9 +398,9 @@ fn replace_match_arm_vec(
     let Some(index) = arms.iter().position(|arm| arm.meta.id == target_id) else {
         return Ok(false);
     };
-    let (slot, rank) = meta_slot_rank(&arms[index].meta);
-    let mut arm = expect_match_arm(replacement.take(), slot)?;
-    assign_meta_slot_and_rank(&mut arm.meta, slot, rank.as_deref(), false);
+    let shell = arms[index].meta.clone();
+    let mut arm = expect_match_arm(replacement.take(), shell.slot.as_deref().unwrap_or(""))?;
+    apply_shell_to_match_arm(&mut arm, &shell);
     arms[index] = arm;
     Ok(true)
 }

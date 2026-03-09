@@ -1,155 +1,149 @@
 # Patch Op Syntax
 
-This document defines the textual syntax for Draxl semantic patch operations.
+This document defines the canonical textual syntax for Draxl semantic patch
+operations.
 
 ## Status
 
-This is the canonical notation for docs, logs, and future tooling.
+This is the canonical notation for docs, logs, patch streams, and future
+tooling.
 
-The current bootstrap implementation does not parse this syntax yet. Today the
-Rust API exposes typed `PatchOp` enums and supports only `insert`, `replace`,
-and `delete` over ranked slot children.
+The current Rust executor already follows this semantic model through structured
+`PatchOp` values. Parsing the textual surface itself is still future work.
 
-## Design rules
-
-- operation names use `verb_kind` snake case such as `replace_expr` and
-  `insert_stmt`
-- targets are addressed by stable ids such as `@e2`
-- inserts name a parent, slot, and rank explicitly instead of using `after` or
-  `before` sibling shorthand
-- replacement and insertion payloads embed Draxl source fragments
-- the operation header owns the outer slot and rank; the fragment owns ids,
-  inner ranks, and inner structure
-
-## Canonical forms
+## Grammar
 
 ```text
-replace_<kind> @target with <fragment>
+op          := insert | put | replace | delete | move | set | clear | attach | detach
 
-delete_<kind> @target
+insert      := "insert" ranked_dest ":" fragment
+put         := "put" slot_ref ":" fragment
+replace     := "replace" node_ref ":" fragment
+delete      := "delete" node_ref
+move        := "move" node_ref "->" dest
+set         := "set" path "=" value
+clear       := "clear" path
+attach      := "attach" node_ref "->" node_ref
+detach      := "detach" node_ref
 
-insert_<kind> into <parent>.<slot> rank=<rank>: <fragment>
-
-attach_doc @doc -> @target
-attach_comment @comment -> @target
+dest        := ranked_dest | slot_ref
+ranked_dest := slot_ref "[" rank "]"
+slot_ref    := owner "." slot
+owner       := "file" | node_ref
+path        := node_ref ("." ident)+
+node_ref    := "@" ident
 ```
-
-## Kinds
-
-Common kinds:
-
-- `item`
-- `field`
-- `variant`
-- `param`
-- `stmt`
-- `arm`
-- `expr`
-- `doc`
-- `comment`
-
-Future profiles may add more kinds, but the naming pattern stays the same.
 
 ## Addressing
 
-### Target ids
+### Node refs
 
-Use `@id` to identify the node being replaced, deleted, or attached.
+Use `@id` to identify an existing node.
 
-### Parent selectors
+Ids are semantic locators. Kind inference comes from schema plus AST lookup,
+not from id spelling.
 
-`<parent>` is either `file` for the root file slot or `@id` for a node-owned
-slot.
+### Slot refs
+
+A slot ref names a profile-defined child slot owned by either the root file or
+another node.
 
 Examples:
 
-- `file.file_items`
+- `file.items`
 - `@m1.items`
 - `@f1.params`
 - `@f1.body`
+- `@f1.ret`
+- `@let1.init`
 - `@e7.arms`
 
-### Slot names
+Use `insert` for ranked slots and `put` for single-child slots.
 
-Slot names match the Draxl AST model:
+### Paths
 
-- `file_items`
-- `items`
-- `fields`
-- `variants`
-- `params`
-- `body`
-- `arms`
+A path addresses a scalar field.
+
+Examples:
+
+- `@f1.name`
+- `@d1.text`
+- `@e7.op`
+- `@s2.semi`
 
 ## Fragments
 
-The `<fragment>` is ordinary Draxl source for the inserted or replacement node.
+Fragments use ordinary Draxl source.
 
 Rules:
 
-- the outer fragment must include its stable id
-- the outer fragment omits its rank in canonical form; `insert_*` gets the
-  outer rank from `rank=...`, while `replace_*` inherits the outer rank from
-  the target node
-- nested ranked children inside the fragment still carry their own `[rank]`
-  metadata
-- the fragment may introduce new ids; the target id is a locator, not an
-  implicit promise that the replacement preserves the old id
+- `insert` and `put` fragments include the outer node id
+- `insert` fragments omit the outer rank
+- `put` fragments omit outer slot metadata
+- `replace` fragments rewrite the node body and must not carry competing outer
+  rank, slot, or anchor metadata
+- `replace` preserves the target node identity and outer placement
+
+## Semantics
+
+### `replace`
+
+`replace @id: ...` is node-oriented.
+
+It preserves:
+
+- the same outer id
+- the same parent owner and slot
+- the same outer rank where applicable
+- the same outer anchor metadata where applicable
+- the same inbound attachment set targeting that id
+
+If you need a different outer identity, use `delete` plus `insert`, or `put`
+when you are setting a single-child slot occupant.
+
+### `put`
+
+`put <owner>.<slot>: ...` is slot-oriented.
+
+It sets the occupant of a single-child slot, whether the slot was empty or
+already occupied. It may therefore replace an occupied slot with a new outer
+node identity.
+
+### `move`
+
+Attachments are identity-bound, not slot-bound.
+
+- `move` carries the moved node and its attachment closure
+- cross-container moves rewrite attachment bookkeeping implicitly
+- moves into contexts that cannot host the attachment closure are rejected
+
+### `attach` and `detach`
+
+These rewrite declared attachment relations under profile constraints. They are
+not arbitrary graph-edge edits.
 
 ## Examples
 
-### Canonical forms
-
-The `replace_expr` form below is part of the intended surface language. The
-currently executable subset appears in the next section.
-
 ```text
-replace_expr @e2 with (@e9 x * @l2 2)
+replace @e2: (@e9 x * @l2 2)
 
-insert_stmt into @f1.body rank=ah: @s4 @e4 trace();
+insert @f1.body[ah]: @s4 @e4 trace();
 
-delete_stmt @s2
+put @f1.ret: @t9 i128
 
-attach_doc @d2 -> @f1
-```
+move @s4 -> @f1.body[ai]
 
-### Bootstrap subset examples
+set @f1.name = add_one_fast
 
-The current runtime supports ranked slot children only:
+clear @d1.text
 
-```text
-replace_stmt @s2 with @s9 @e9 audit();
+attach @d2 -> @f1
 
-insert_stmt into @f1.body rank=ah: @s4 @e4 trace();
-
-delete_stmt @s2
-```
-
-Root and nested item insertion use the same address form:
-
-```text
-insert_item into file.file_items rank=b:
-  @f9 fn helper(@p9[a] x: @t9 i64) -> @t10 i64 {
-    @s9[a] @e9 x
-  }
-
-insert_item into @m1.items rank=c:
-  @f10 fn extra() {}
+detach @d2
 ```
 
 ## Current implementation boundary
 
-The current `draxl-patch` crate supports only these structural families:
-
-- `insert_item`
-- `insert_field`
-- `insert_variant`
-- `insert_param`
-- `insert_stmt`
-- `insert_arm`
-- matching `replace_*`
-- matching `delete_*`
-
-Expression replacement, move operations, and attachment ops are part of the
-intended surface language but are not implemented in the bootstrap patch engine
-yet.
+The current executor supports the semantic model above through the structured
+Rust API over the modeled Rust profile. The textual syntax in this document is
+canonical, but not parsed yet.
