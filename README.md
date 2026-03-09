@@ -133,18 +133,6 @@ the level of the program tree.
 The current Rust patch API already follows that semantic split. Textual patch
 parsing for the canonical surface is still future tooling.
 
-## Example patch ops
-
-Canonical docs syntax:
-
-```text
-replace @e2: (@e9 x * @l2 2)
-
-insert @f1.body[b]: @s3 let @p3 z = @e4 (y + @l3 1);
-
-attach @d2 -> @f1
-```
-
 ## Example Draxl source
 
 ```text
@@ -172,6 +160,16 @@ Doc and line comments attach implicitly to the next semantic sibling when an
 explicit anchor is absent.
 
 ## Concurrent edit example
+
+Canonical patch ops:
+
+```text
+replace @e2: (@e9 x * @l2 2)
+
+insert @f1.body[b]: @s3 let @p3 z = @e4 (y + @l3 1);
+
+attach @d2 -> @f1
+```
 
 Starting block:
 
