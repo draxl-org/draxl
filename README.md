@@ -212,16 +212,6 @@ The current milestone supports:
   the current scalar path subset: names, trivia text, operators, and statement
   semicolon state
 
-## Try it
-
-```bash
-cargo run -p draxl-cli -- parse examples/01_add.rs.dx
-cargo run -p draxl-cli -- fmt examples/01_add.rs.dx
-cargo run -p draxl-cli -- dump-json examples/01_add.rs.dx
-cargo run -p draxl-cli -- validate examples/01_add.rs.dx
-cargo run -p draxl-cli -- lower-rust examples/01_add.rs.dx
-```
-
 ## Architecture
 
 The current workspace is intentionally split by responsibility:
@@ -284,6 +274,16 @@ The `examples/` directory is a guided tour of the current Rust profile:
   and `b` to show how deterministic insertion order works inside a block
 - `examples/05_use_tree_group.rs.dx` covers grouped `use` trees, `self` and
   glob imports, qualified paths, and a multi-parameter function
+
+### Try it
+
+```bash
+cargo run -p draxl-cli -- parse examples/01_add.rs.dx
+cargo run -p draxl-cli -- fmt examples/01_add.rs.dx
+cargo run -p draxl-cli -- dump-json examples/01_add.rs.dx
+cargo run -p draxl-cli -- validate examples/01_add.rs.dx
+cargo run -p draxl-cli -- lower-rust examples/01_add.rs.dx
+```
 
 ## License
 
