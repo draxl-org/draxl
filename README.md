@@ -101,7 +101,8 @@ The current workspace is intentionally split by responsibility:
 - `draxl-validate`: structural validation for ids, ranks, and anchors
 - `draxl-printer`: canonicalization and source printing
 - `draxl-lower-rust`: lowering from validated Draxl to ordinary Rust
-- `draxl-patch`: structured patch operators over ids and ranked slots
+- `draxl-patch`: structured patch operators over ids, profile-defined slots,
+  attachments, and scalar paths
 - `draxl-cli`: command-line entry point
 
 ```text
@@ -121,17 +122,21 @@ Draxl treats semantic patch operators as first-class infrastructure for
 agent-native editing, not as a convenience wrapper around text replacement.
 
 Instead of rewriting byte ranges, a tool addresses stable node IDs and ranked
-slots, single-child slots, attachment relations, and schema-defined paths. An
-edit can replace a node body, insert into a ranked slot, put a new occupant
-into a single-child slot, move a node, delete a node, attach trivia, or update
-scalar fields.
+slots, single-child slots, attachment relations, and schema-defined scalar
+paths. An edit can replace a node body, insert into a ranked slot, put a new
+occupant into a single-child slot, move a node, delete a node, attach trivia,
+or update scalar fields.
 
 That makes patches precise enough to replay across branch stacks and long-lived
 forks, merge cleanly when they touch different semantic regions, and audit at
 the level of the program tree.
 
-The current Rust patch API already follows that semantic split. Textual patch
-parsing for the canonical surface is still future tooling.
+Today the executor exposes that model through the structured Rust API. The
+canonical textual notation used in the docs is not parsed yet.
+
+The current path-op subset is intentionally narrow. It supports scalar fields
+such as `@f1.name`, `@d1.text`, `@e7.op`, and `@s2.semi`, not arbitrary source
+text replacement.
 
 ## Example Draxl source
 
@@ -161,14 +166,18 @@ explicit anchor is absent.
 
 ## Concurrent edit example
 
-Canonical patch ops:
+Canonical patch notation for future tooling (not yet executable):
 
 ```text
-replace @e2: (@e9 x * @l2 2)
+replace @e2: (@e2 x * @l2 2)
 
 insert @f1.body[b]: @s3 let @p3 z = @e4 (y + @l3 1);
 
 attach @d2 -> @f1
+
+set @f1.name = add_one_fast
+
+clear @d1.text
 ```
 
 Starting block:
@@ -188,7 +197,7 @@ insert @f1.body[ah]: @s4 @e4 trace();
 Agent B rewrites expression `@e2`:
 
 ```text
-replace @e2: @e9 audit();
+replace @e2: @e2 audit()
 ```
 
 Merged result:
@@ -196,7 +205,7 @@ Merged result:
 ```text
 @s1[a] @e1 fetch();
 @s4[ah] @e4 trace();
-@s2[am] @e9 audit();
+@s2[am] @e2 audit();
 @s3[b] @e3 validate();
 ```
 
@@ -232,7 +241,8 @@ The current milestone supports:
 - dumping deterministic JSON for the IR
 - lowering the current profile to ordinary Rust
 - applying semantic patch ops over ids, schema-defined slots, attachments, and
-  scalar field paths in the current modeled subset
+  the current scalar path subset: names, trivia text, operators, and statement
+  semicolon state
 
 ## Try it
 
