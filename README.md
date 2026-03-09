@@ -269,13 +269,21 @@ let lowered = lower_rust_source(
 ) ?;
 ```
 
-## Example corpus
+## Examples
 
-- `examples/01_add.rs.dx`
-- `examples/02_shapes.rs.dx`
-- `examples/03_match.rs.dx`
-- `examples/04_ranks.rs.dx`
-- `examples/05_use_tree_group.rs.dx`
+The `examples/` directory is a guided tour of the current Rust profile:
+
+- `examples/01_add.rs.dx` is the smallest end-to-end example: stable ids,
+  ranked params and statements, implicit doc/comment attachment, and lowering
+  to ordinary Rust
+- `examples/02_shapes.rs.dx` shows item-level ordering over a `struct` and an
+  `enum`, including ranked fields and variants
+- `examples/03_match.rs.dx` exercises `match` expressions, ranked arms, guard
+  expressions, binary `<`, and unary minus
+- `examples/04_ranks.rs.dx` isolates lexicographic ranks such as `a`, `am`,
+  and `b` to show how deterministic insertion order works inside a block
+- `examples/05_use_tree_group.rs.dx` covers grouped `use` trees, `self` and
+  glob imports, qualified paths, and a multi-parameter function
 
 ## License
 
