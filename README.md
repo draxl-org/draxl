@@ -277,14 +277,6 @@ let lowered = lower_rust_source(
 - `examples/04_ranks.rs.dx`
 - `examples/05_use_tree_group.rs.dx`
 
-## Roadmap
-
-- widen the current Rust profile beyond the bootstrap examples
-- extend the patch model from insert/replace/delete to richer structural ops
-- add additional language profiles without changing the core identity, rank,
-  anchor, and patch model
-- harden merge-friendly workflows around stable ids, ranks, and anchors
-
 ## License
 
 Licensed under `MIT OR Apache-2.0`.
