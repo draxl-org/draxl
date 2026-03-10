@@ -4,6 +4,7 @@ use super::support::{
 };
 use crate::error::{patch_error, PatchError};
 use crate::model::{PatchNode, SlotOwner, SlotRef};
+use crate::schema::{expr_kind, invalid_single_slot_message, item_kind, single_slot_spec};
 use draxl_ast::{Block, Expr, File, Item, MatchArm, Stmt};
 
 pub(super) fn apply_put(file: &mut File, slot: SlotRef, node: PatchNode) -> Result<(), PatchError> {
@@ -43,23 +44,21 @@ fn put_in_item(
     node: &mut Option<PatchNode>,
 ) -> Result<bool, PatchError> {
     if item.meta().id == owner_id {
+        let spec = single_slot_spec(item_kind(item), public_slot).ok_or_else(|| {
+            patch_error(&invalid_single_slot_message(
+                &format!("@{owner_id}"),
+                public_slot,
+            ))
+        })?;
         match item {
-            Item::Fn(function) if public_slot == "ret" => {
-                let mut ty = expect_type(node.take(), public_slot)?;
-                assign_type_slot_and_rank(&mut ty, "ret", None, true);
+            Item::Fn(function) => {
+                let mut ty = expect_type(node.take(), spec.public_name)?;
+                assign_type_slot_and_rank(&mut ty, spec.meta_slot_name, None, true);
                 function.ret_ty = Some(ty);
                 return Ok(true);
             }
-            Item::Mod(_) | Item::Use(_) | Item::Struct(_) | Item::Enum(_) | Item::Fn(_) => {
-                return Err(patch_error(&format!(
-                    "slot `@{owner_id}.{public_slot}` is not available for `put`"
-                )));
-            }
-            Item::Doc(_) | Item::Comment(_) => {
-                return Err(patch_error(
-                    "doc and comment nodes do not own single-child patch slots",
-                ));
-            }
+            Item::Mod(_) | Item::Use(_) | Item::Struct(_) | Item::Enum(_) => unreachable!(),
+            Item::Doc(_) | Item::Comment(_) => unreachable!(),
         }
     }
 
@@ -74,13 +73,15 @@ fn put_in_item(
         Item::Struct(strukt) => {
             for field in &mut strukt.fields {
                 if field.meta.id == owner_id {
-                    if public_slot != "ty" {
-                        return Err(patch_error(&format!(
-                            "slot `@{owner_id}.{public_slot}` is not available for `put`"
-                        )));
-                    }
-                    let mut ty = expect_type(node.take(), public_slot)?;
-                    assign_type_slot_and_rank(&mut ty, "ty", None, true);
+                    let spec = single_slot_spec(crate::schema::NodeKind::Field, public_slot)
+                        .ok_or_else(|| {
+                            patch_error(&invalid_single_slot_message(
+                                &format!("@{owner_id}"),
+                                public_slot,
+                            ))
+                        })?;
+                    let mut ty = expect_type(node.take(), spec.public_name)?;
+                    assign_type_slot_and_rank(&mut ty, spec.meta_slot_name, None, true);
                     field.ty = ty;
                     return Ok(true);
                 }
@@ -89,13 +90,15 @@ fn put_in_item(
         Item::Fn(function) => {
             for param in &mut function.params {
                 if param.meta.id == owner_id {
-                    if public_slot != "ty" {
-                        return Err(patch_error(&format!(
-                            "slot `@{owner_id}.{public_slot}` is not available for `put`"
-                        )));
-                    }
-                    let mut ty = expect_type(node.take(), public_slot)?;
-                    assign_type_slot_and_rank(&mut ty, "ty", None, true);
+                    let spec = single_slot_spec(crate::schema::NodeKind::Param, public_slot)
+                        .ok_or_else(|| {
+                            patch_error(&invalid_single_slot_message(
+                                &format!("@{owner_id}"),
+                                public_slot,
+                            ))
+                        })?;
+                    let mut ty = expect_type(node.take(), spec.public_name)?;
+                    assign_type_slot_and_rank(&mut ty, spec.meta_slot_name, None, true);
                     param.ty = ty;
                     return Ok(true);
                 }
@@ -138,30 +141,36 @@ fn put_in_stmt(
     node: &mut Option<PatchNode>,
 ) -> Result<bool, PatchError> {
     if super::support::stmt_id(stmt).is_some_and(|id| id == owner_id) {
+        let spec =
+            single_slot_spec(crate::schema::stmt_kind(stmt), public_slot).ok_or_else(|| {
+                patch_error(&invalid_single_slot_message(
+                    &format!("@{owner_id}"),
+                    public_slot,
+                ))
+            })?;
         match stmt {
-            Stmt::Let(let_stmt) if public_slot == "pat" => {
-                let mut pattern = expect_pattern(node.take(), public_slot)?;
-                assign_pattern_slot_and_rank(&mut pattern, "pat", None, true);
-                let_stmt.pat = pattern;
-                return Ok(true);
-            }
-            Stmt::Let(let_stmt) if public_slot == "init" => {
-                let mut expr = expect_expr(node.take(), public_slot)?;
-                assign_expr_slot_and_rank(&mut expr, "init", None, true);
-                let_stmt.value = expr;
-                return Ok(true);
-            }
-            Stmt::Expr(expr_stmt) if public_slot == "expr" => {
-                let mut expr = expect_expr(node.take(), public_slot)?;
-                assign_expr_slot_and_rank(&mut expr, "expr", None, true);
+            Stmt::Let(let_stmt) => match spec.fragment_kind {
+                crate::schema::FragmentKind::Pattern => {
+                    let mut pattern = expect_pattern(node.take(), spec.public_name)?;
+                    assign_pattern_slot_and_rank(&mut pattern, spec.meta_slot_name, None, true);
+                    let_stmt.pat = pattern;
+                    return Ok(true);
+                }
+                crate::schema::FragmentKind::Expr => {
+                    let mut expr = expect_expr(node.take(), spec.public_name)?;
+                    assign_expr_slot_and_rank(&mut expr, spec.meta_slot_name, None, true);
+                    let_stmt.value = expr;
+                    return Ok(true);
+                }
+                _ => unreachable!(),
+            },
+            Stmt::Expr(expr_stmt) => {
+                let mut expr = expect_expr(node.take(), spec.public_name)?;
+                assign_expr_slot_and_rank(&mut expr, spec.meta_slot_name, None, true);
                 expr_stmt.expr = expr;
                 return Ok(true);
             }
-            Stmt::Item(_) | Stmt::Doc(_) | Stmt::Comment(_) | Stmt::Let(_) | Stmt::Expr(_) => {
-                return Err(patch_error(&format!(
-                    "slot `@{owner_id}.{public_slot}` is not available for `put`"
-                )));
-            }
+            Stmt::Item(_) | Stmt::Doc(_) | Stmt::Comment(_) => unreachable!(),
         }
     }
 
@@ -180,55 +189,48 @@ fn put_in_expr(
     node: &mut Option<PatchNode>,
 ) -> Result<bool, PatchError> {
     if super::support::expr_id(expr).is_some_and(|id| id == owner_id) {
+        let spec = single_slot_spec(expr_kind(expr), public_slot).ok_or_else(|| {
+            patch_error(&invalid_single_slot_message(
+                &format!("@{owner_id}"),
+                public_slot,
+            ))
+        })?;
         match expr {
-            Expr::Group(group) if public_slot == "expr" => {
-                let mut inner = expect_expr(node.take(), public_slot)?;
-                assign_expr_slot_and_rank(&mut inner, "expr", None, true);
+            Expr::Group(group) => {
+                let mut inner = expect_expr(node.take(), spec.public_name)?;
+                assign_expr_slot_and_rank(&mut inner, spec.meta_slot_name, None, true);
                 group.expr = Box::new(inner);
                 return Ok(true);
             }
-            Expr::Binary(binary) if public_slot == "lhs" => {
-                let mut inner = expect_expr(node.take(), public_slot)?;
-                assign_expr_slot_and_rank(&mut inner, "lhs", None, true);
-                binary.lhs = Box::new(inner);
+            Expr::Binary(binary) => {
+                let mut inner = expect_expr(node.take(), spec.public_name)?;
+                assign_expr_slot_and_rank(&mut inner, spec.meta_slot_name, None, true);
+                if spec.public_name == "lhs" {
+                    binary.lhs = Box::new(inner);
+                } else {
+                    binary.rhs = Box::new(inner);
+                }
                 return Ok(true);
             }
-            Expr::Binary(binary) if public_slot == "rhs" => {
-                let mut inner = expect_expr(node.take(), public_slot)?;
-                assign_expr_slot_and_rank(&mut inner, "rhs", None, true);
-                binary.rhs = Box::new(inner);
-                return Ok(true);
-            }
-            Expr::Unary(unary) if public_slot == "expr" => {
-                let mut inner = expect_expr(node.take(), public_slot)?;
-                assign_expr_slot_and_rank(&mut inner, "expr", None, true);
+            Expr::Unary(unary) => {
+                let mut inner = expect_expr(node.take(), spec.public_name)?;
+                assign_expr_slot_and_rank(&mut inner, spec.meta_slot_name, None, true);
                 unary.expr = Box::new(inner);
                 return Ok(true);
             }
-            Expr::Call(call) if public_slot == "callee" => {
-                let mut inner = expect_expr(node.take(), public_slot)?;
-                assign_expr_slot_and_rank(&mut inner, "callee", None, true);
+            Expr::Call(call) => {
+                let mut inner = expect_expr(node.take(), spec.public_name)?;
+                assign_expr_slot_and_rank(&mut inner, spec.meta_slot_name, None, true);
                 call.callee = Box::new(inner);
                 return Ok(true);
             }
-            Expr::Match(match_expr) if public_slot == "scrutinee" => {
-                let mut inner = expect_expr(node.take(), public_slot)?;
-                assign_expr_slot_and_rank(&mut inner, "scrutinee", None, true);
+            Expr::Match(match_expr) => {
+                let mut inner = expect_expr(node.take(), spec.public_name)?;
+                assign_expr_slot_and_rank(&mut inner, spec.meta_slot_name, None, true);
                 match_expr.scrutinee = Box::new(inner);
                 return Ok(true);
             }
-            Expr::Block(_)
-            | Expr::Path(_)
-            | Expr::Lit(_)
-            | Expr::Group(_)
-            | Expr::Binary(_)
-            | Expr::Unary(_)
-            | Expr::Call(_)
-            | Expr::Match(_) => {
-                return Err(patch_error(&format!(
-                    "slot `@{owner_id}.{public_slot}` is not available for `put`"
-                )));
-            }
+            Expr::Block(_) | Expr::Path(_) | Expr::Lit(_) => unreachable!(),
         }
     }
 
@@ -275,30 +277,33 @@ fn put_in_match_arm(
     node: &mut Option<PatchNode>,
 ) -> Result<bool, PatchError> {
     if arm.meta.id == owner_id {
-        match public_slot {
-            "pat" => {
-                let mut pattern = expect_pattern(node.take(), public_slot)?;
-                assign_pattern_slot_and_rank(&mut pattern, "pat", None, true);
+        let spec =
+            single_slot_spec(crate::schema::NodeKind::MatchArm, public_slot).ok_or_else(|| {
+                patch_error(&invalid_single_slot_message(
+                    &format!("@{owner_id}"),
+                    public_slot,
+                ))
+            })?;
+        match spec.fragment_kind {
+            crate::schema::FragmentKind::Pattern => {
+                let mut pattern = expect_pattern(node.take(), spec.public_name)?;
+                assign_pattern_slot_and_rank(&mut pattern, spec.meta_slot_name, None, true);
                 arm.pat = pattern;
                 return Ok(true);
             }
-            "guard" => {
-                let mut expr = expect_expr(node.take(), public_slot)?;
-                assign_expr_slot_and_rank(&mut expr, "guard", None, true);
+            crate::schema::FragmentKind::Expr if spec.public_name == "guard" => {
+                let mut expr = expect_expr(node.take(), spec.public_name)?;
+                assign_expr_slot_and_rank(&mut expr, spec.meta_slot_name, None, true);
                 arm.guard = Some(expr);
                 return Ok(true);
             }
-            "body" => {
-                let mut expr = expect_expr(node.take(), public_slot)?;
-                assign_expr_slot_and_rank(&mut expr, "body", None, true);
+            crate::schema::FragmentKind::Expr => {
+                let mut expr = expect_expr(node.take(), spec.public_name)?;
+                assign_expr_slot_and_rank(&mut expr, spec.meta_slot_name, None, true);
                 arm.body = expr;
                 return Ok(true);
             }
-            _ => {
-                return Err(patch_error(&format!(
-                    "slot `@{owner_id}.{public_slot}` is not available for `put`"
-                )));
-            }
+            _ => unreachable!(),
         }
     }
 

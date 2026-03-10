@@ -1,5 +1,9 @@
 use crate::error::{patch_error, PatchError};
 use crate::model::{PatchPath, PatchValue};
+use crate::schema::{
+    clearable_path_spec, find_node_kind, invalid_clear_path_message, invalid_set_path_message,
+    path_spec, value_kind_label, ValueKind,
+};
 use draxl_ast::{BinaryOp, Expr, File, Item, Pattern, Stmt, Type, UnaryOp};
 
 pub(super) fn apply_set(
@@ -7,6 +11,22 @@ pub(super) fn apply_set(
     path: PatchPath,
     value: PatchValue,
 ) -> Result<(), PatchError> {
+    let target_kind = find_node_kind(file, &path.node_id).ok_or_else(|| {
+        patch_error(&format!(
+            "set target `@{}.{}` was not found",
+            path.node_id,
+            path.segments.join(".")
+        ))
+    })?;
+    let segment = single_path_segment(&path)?;
+    let spec = path_spec(target_kind, segment).ok_or_else(|| {
+        patch_error(&invalid_set_path_message(
+            &path.node_id,
+            segment,
+            target_kind,
+        ))
+    })?;
+    expect_value_kind(&value, spec.value_kind, &path.node_id, segment)?;
     if apply_set_in_items(&mut file.items, &path.node_id, &path.segments, &value)? {
         Ok(())
     } else {
@@ -19,6 +39,21 @@ pub(super) fn apply_set(
 }
 
 pub(super) fn apply_clear(file: &mut File, path: PatchPath) -> Result<(), PatchError> {
+    let target_kind = find_node_kind(file, &path.node_id).ok_or_else(|| {
+        patch_error(&format!(
+            "clear target `@{}.{}` was not found or is not clearable",
+            path.node_id,
+            path.segments.join(".")
+        ))
+    })?;
+    let segment = single_path_segment(&path)?;
+    clearable_path_spec(target_kind, segment).ok_or_else(|| {
+        patch_error(&invalid_clear_path_message(
+            &path.node_id,
+            segment,
+            target_kind,
+        ))
+    })?;
     if apply_clear_in_items(&mut file.items, &path.node_id, &path.segments)? {
         Ok(())
     } else {
@@ -674,5 +709,31 @@ fn parse_unary_op(value: &PatchValue) -> Result<UnaryOp, PatchError> {
     match value {
         PatchValue::Ident(value) if value == "neg" => Ok(UnaryOp::Neg),
         _ => Err(patch_error("unary `op` expects `neg`")),
+    }
+}
+
+fn single_path_segment(path: &PatchPath) -> Result<&str, PatchError> {
+    if path.segments.len() != 1 {
+        return Err(patch_error(
+            "only single-segment scalar patch paths are supported in the current Rust profile",
+        ));
+    }
+    Ok(path.segments[0].as_str())
+}
+
+fn expect_value_kind(
+    value: &PatchValue,
+    expected: ValueKind,
+    node_id: &str,
+    segment: &str,
+) -> Result<(), PatchError> {
+    match (value, expected) {
+        (PatchValue::Ident(_), ValueKind::Ident)
+        | (PatchValue::Str(_), ValueKind::Str)
+        | (PatchValue::Bool(_), ValueKind::Bool) => Ok(()),
+        _ => Err(patch_error(&format!(
+            "path `@{node_id}.{segment}` expects {}",
+            value_kind_label(expected)
+        ))),
     }
 }

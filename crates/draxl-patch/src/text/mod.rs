@@ -1,7 +1,6 @@
 mod error;
 mod parse;
 mod resolve;
-mod schema;
 mod surface;
 
 use crate::model::PatchOp;

@@ -1,6 +1,9 @@
 mod support;
 
-use draxl::{self, patch::PatchOp};
+use draxl::{
+    self,
+    patch::{PatchNode, PatchOp, PatchPath, PatchValue, SlotOwner, SlotRef},
+};
 use draxl_printer::print_file;
 use draxl_validate::validate_file;
 use support::read;
@@ -74,4 +77,66 @@ fn apply_patch_text_reports_schema_errors_with_patch_locations() {
     let error = draxl::apply_patch_text(&mut file, patch).expect_err("path should be rejected");
     assert!(error.to_string().contains("line 1, column 9"));
     assert!(error.to_string().contains("not settable"));
+}
+
+#[test]
+fn structured_and_textual_put_share_the_same_slot_validation_message() {
+    let source = read("examples/01_add.rs.dx");
+    let mut structured_file = draxl::parse_and_validate(&source).expect("example should parse");
+    let mut textual_file = draxl::parse_and_validate(&source).expect("example should parse");
+
+    let structured_error = draxl::apply_patch(
+        &mut structured_file,
+        PatchOp::Put {
+            slot: SlotRef {
+                owner: SlotOwner::Node("f1".to_owned()),
+                slot: "body".to_owned(),
+            },
+            node: PatchNode::Type(
+                draxl::parser::parse_type_fragment("@t9 i128").expect("type fragment should parse"),
+            ),
+        },
+    )
+    .expect_err("slot should be rejected")
+    .to_string();
+
+    let textual_error = draxl::apply_patch_text(&mut textual_file, "put @f1.body: @t9 i128\n")
+        .expect_err("slot should be rejected")
+        .to_string();
+
+    assert_eq!(structured_error, strip_location(&textual_error));
+}
+
+#[test]
+fn structured_and_textual_set_share_the_same_path_validation_message() {
+    let source = read("examples/01_add.rs.dx");
+    let mut structured_file = draxl::parse_and_validate(&source).expect("example should parse");
+    let mut textual_file = draxl::parse_and_validate(&source).expect("example should parse");
+
+    let structured_error = draxl::apply_patch(
+        &mut structured_file,
+        PatchOp::Set {
+            path: PatchPath {
+                node_id: "f1".to_owned(),
+                segments: vec!["text".to_owned()],
+            },
+            value: PatchValue::Str("nope".to_owned()),
+        },
+    )
+    .expect_err("path should be rejected")
+    .to_string();
+
+    let textual_error = draxl::apply_patch_text(&mut textual_file, "set @f1.text = \"nope\"\n")
+        .expect_err("path should be rejected")
+        .to_string();
+
+    assert_eq!(structured_error, strip_location(&textual_error));
+}
+
+fn strip_location(message: &str) -> String {
+    message
+        .split(" at line ")
+        .next()
+        .expect("split should always produce a first segment")
+        .to_owned()
 }

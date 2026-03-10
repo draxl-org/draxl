@@ -9,6 +9,7 @@
 mod apply;
 mod error;
 mod model;
+mod schema;
 mod text;
 
 pub use apply::{apply_op, apply_ops};

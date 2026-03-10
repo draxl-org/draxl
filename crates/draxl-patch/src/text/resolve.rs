@@ -1,13 +1,15 @@
 use super::error::{map_fragment_parse_error, patch_text_error, PatchTextError};
-use super::schema::{
-    clear_path_supported, find_node_kind, node_kind_label, replace_fragment_kind,
-    resolve_ranked_slot, resolve_single_slot, set_value_kind, FragmentKind, NodeKind, ValueKind,
-};
 use super::surface::{
     SurfaceDest, SurfaceFragment, SurfaceNodeRef, SurfacePatchOp, SurfacePath, SurfaceRankedDest,
     SurfaceSlotOwner, SurfaceSlotRef, SurfaceValue, SurfaceValueKind,
 };
 use crate::model::{PatchDest, PatchNode, PatchOp, PatchPath, PatchValue, RankedDest, SlotOwner};
+use crate::schema::{
+    clearable_path_spec, find_node_kind, invalid_clear_path_message, invalid_ranked_slot_message,
+    invalid_set_path_message, invalid_single_slot_message, node_kind_label, path_spec,
+    ranked_slot_spec, replace_fragment_kind, single_slot_spec, value_kind_label, FragmentKind,
+    NodeKind, ValueKind,
+};
 use draxl_ast::{File, Span};
 
 #[derive(Debug, Clone)]
@@ -42,7 +44,8 @@ pub(super) fn resolve_op(
         SurfacePatchOp::Insert { dest, fragment, .. } => {
             let resolved_dest = resolve_ranked_dest(file, source, dest)?;
             let owner_kind = dest_owner_kind(file, source, &dest.slot.owner)?;
-            let fragment_kind = resolve_ranked_slot(owner_kind, &dest.slot.slot)
+            let fragment_kind = ranked_slot_spec(owner_kind, &dest.slot.slot)
+                .map(|spec| spec.fragment_kind)
                 .expect("ranked destination fragment kind must already be validated before use");
             PatchOp::Insert {
                 dest: resolved_dest,
@@ -51,18 +54,15 @@ pub(super) fn resolve_op(
         }
         SurfacePatchOp::Put { slot, fragment, .. } => {
             let owner_kind = dest_owner_kind(file, source, &slot.owner)?;
-            let fragment_kind = resolve_single_slot(owner_kind, &slot.slot).ok_or_else(|| {
-                patch_text_error(
-                    source,
-                    slot.slot_span,
-                    &format!(
-                        "slot `{}.{}` is not a single-child patch slot on {}",
-                        owner_label(&slot.owner),
-                        slot.slot,
-                        node_kind_label(owner_kind)
-                    ),
-                )
-            })?;
+            let fragment_kind = single_slot_spec(owner_kind, &slot.slot)
+                .map(|spec| spec.fragment_kind)
+                .ok_or_else(|| {
+                    patch_text_error(
+                        source,
+                        slot.slot_span,
+                        &invalid_single_slot_message(&owner_label(&slot.owner), &slot.slot),
+                    )
+                })?;
             PatchOp::Put {
                 slot: resolve_slot_ref(file, source, slot)?,
                 node: parse_fragment(source, fragment, fragment_kind)?,
@@ -92,16 +92,11 @@ pub(super) fn resolve_op(
             let node_kind = resolve_node_kind(file, source, &path.node)?;
             ensure_single_segment_path(source, path)?;
             let segment = &path.segments[0];
-            if !clear_path_supported(node_kind, &segment.name) {
+            if clearable_path_spec(node_kind, &segment.name).is_none() {
                 return Err(patch_text_error(
                     source,
                     segment.span,
-                    &format!(
-                        "path `@{}.{}` is not clearable on {}",
-                        path.node.id,
-                        segment.name,
-                        node_kind_label(node_kind)
-                    ),
+                    &invalid_clear_path_message(&path.node.id, &segment.name, node_kind),
                 ));
             }
             PatchOp::Clear {
@@ -131,7 +126,7 @@ fn resolve_move_dest(
         }
         SurfaceDest::Slot(slot) => {
             let owner_kind = dest_owner_kind(file, source, &slot.owner)?;
-            if resolve_single_slot(owner_kind, &slot.slot).is_none() {
+            if single_slot_spec(owner_kind, &slot.slot).is_none() {
                 return Err(patch_text_error(
                     source,
                     slot.slot_span,
@@ -154,16 +149,11 @@ fn resolve_ranked_dest(
     dest: &SurfaceRankedDest,
 ) -> Result<RankedDest, PatchTextError> {
     let owner_kind = dest_owner_kind(file, source, &dest.slot.owner)?;
-    if resolve_ranked_slot(owner_kind, &dest.slot.slot).is_none() {
+    if ranked_slot_spec(owner_kind, &dest.slot.slot).is_none() {
         return Err(patch_text_error(
             source,
             dest.slot.slot_span,
-            &format!(
-                "slot `{}.{}` is not a ranked patch slot on {}",
-                owner_label(&dest.slot.owner),
-                dest.slot.slot,
-                node_kind_label(owner_kind)
-            ),
+            &invalid_ranked_slot_message(&owner_label(&dest.slot.owner), &dest.slot.slot),
         ));
     }
     Ok(RankedDest {
@@ -215,18 +205,15 @@ fn resolve_value(
     let node_kind = resolve_node_kind(file, source, &path.node)?;
     ensure_single_segment_path(source, path)?;
     let segment = &path.segments[0];
-    let value_kind = set_value_kind(node_kind, &segment.name).ok_or_else(|| {
-        patch_text_error(
-            source,
-            segment.span,
-            &format!(
-                "path `@{}.{}` is not settable on {}",
-                path.node.id,
-                segment.name,
-                node_kind_label(node_kind)
-            ),
-        )
-    })?;
+    let value_kind = path_spec(node_kind, &segment.name)
+        .map(|spec| spec.value_kind)
+        .ok_or_else(|| {
+            patch_text_error(
+                source,
+                segment.span,
+                &invalid_set_path_message(&path.node.id, &segment.name, node_kind),
+            )
+        })?;
     match (&value.kind, value_kind) {
         (SurfaceValueKind::Ident(inner), ValueKind::Ident) => Ok(PatchValue::Ident(inner.clone())),
         (SurfaceValueKind::Str(inner), ValueKind::Str) => Ok(PatchValue::Str(inner.clone())),
@@ -343,13 +330,5 @@ fn owner_label(owner: &SurfaceSlotOwner) -> String {
     match owner {
         SurfaceSlotOwner::File { .. } => "file".to_owned(),
         SurfaceSlotOwner::Node(node) => format!("@{}", node.id),
-    }
-}
-
-fn value_kind_label(value_kind: ValueKind) -> &'static str {
-    match value_kind {
-        ValueKind::Ident => "an identifier value",
-        ValueKind::Str => "a string value",
-        ValueKind::Bool => "a boolean value",
     }
 }

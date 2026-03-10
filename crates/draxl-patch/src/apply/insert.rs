@@ -5,6 +5,9 @@ use super::support::{
 };
 use crate::error::{patch_error, PatchError};
 use crate::model::{PatchNode, RankedDest, SlotOwner};
+use crate::schema::{
+    expr_kind, invalid_ranked_slot_message, item_kind, ranked_slot_spec, NodeKind,
+};
 use draxl_ast::{Block, Expr, File, Item, Stmt};
 
 pub(super) fn apply_insert(
@@ -48,13 +51,10 @@ fn insert_into_file_slot(
     rank: &str,
     node: &mut Option<PatchNode>,
 ) -> Result<(), PatchError> {
-    if public_slot != "items" {
-        return Err(patch_error(&format!(
-            "slot `file.{public_slot}` is invalid for ranked insertion"
-        )));
-    }
-    let mut item = expect_item(node.take(), public_slot)?;
-    assign_item_slot_and_rank(&mut item, "file_items", Some(rank), true)?;
+    let spec = ranked_slot_spec(NodeKind::File, public_slot)
+        .ok_or_else(|| patch_error(&invalid_ranked_slot_message("file", public_slot)))?;
+    let mut item = expect_item(node.take(), spec.public_name)?;
+    assign_item_slot_and_rank(&mut item, spec.meta_slot_name, Some(rank), true)?;
     items.push(item);
     Ok(())
 }
@@ -67,42 +67,56 @@ fn insert_into_item(
     node: &mut Option<PatchNode>,
 ) -> Result<bool, PatchError> {
     if item.meta().id == owner_id {
+        let spec = ranked_slot_spec(item_kind(item), public_slot).ok_or_else(|| {
+            patch_error(&invalid_ranked_slot_message(
+                &format!("@{owner_id}"),
+                public_slot,
+            ))
+        })?;
         match item {
-            Item::Mod(module) if public_slot == "items" => {
-                let mut child = expect_item(node.take(), public_slot)?;
-                assign_item_slot_and_rank(&mut child, "items", Some(rank), true)?;
+            Item::Mod(module) => {
+                let mut child = expect_item(node.take(), spec.public_name)?;
+                assign_item_slot_and_rank(&mut child, spec.meta_slot_name, Some(rank), true)?;
                 module.items.push(child);
                 return Ok(true);
             }
-            Item::Struct(strukt) if public_slot == "fields" => {
-                let mut field = expect_field(node.take(), public_slot)?;
-                assign_meta_slot_and_rank(&mut field.meta, "fields", Some(rank), true);
+            Item::Struct(strukt) => {
+                let mut field = expect_field(node.take(), spec.public_name)?;
+                assign_meta_slot_and_rank(&mut field.meta, spec.meta_slot_name, Some(rank), true);
                 strukt.fields.push(field);
                 return Ok(true);
             }
-            Item::Enum(enm) if public_slot == "variants" => {
-                let mut variant = expect_variant(node.take(), public_slot)?;
-                assign_meta_slot_and_rank(&mut variant.meta, "variants", Some(rank), true);
+            Item::Enum(enm) => {
+                let mut variant = expect_variant(node.take(), spec.public_name)?;
+                assign_meta_slot_and_rank(&mut variant.meta, spec.meta_slot_name, Some(rank), true);
                 enm.variants.push(variant);
                 return Ok(true);
             }
-            Item::Fn(function) if public_slot == "params" => {
-                let mut param = expect_param(node.take(), public_slot)?;
-                assign_meta_slot_and_rank(&mut param.meta, "params", Some(rank), true);
-                function.params.push(param);
-                return Ok(true);
-            }
-            Item::Fn(function) if public_slot == "body" => {
-                let mut stmt = expect_stmt(node.take(), public_slot)?;
-                assign_stmt_slot_and_rank(&mut stmt, "body", Some(rank), true)?;
-                function.body.stmts.push(stmt);
-                return Ok(true);
-            }
-            _ => {
-                return Err(patch_error(&format!(
-                    "slot `@{owner_id}.{public_slot}` is not available for ranked insertion"
-                )));
-            }
+            Item::Fn(function) => match spec.fragment_kind {
+                crate::schema::FragmentKind::Param => {
+                    let mut param = expect_param(node.take(), spec.public_name)?;
+                    assign_meta_slot_and_rank(
+                        &mut param.meta,
+                        spec.meta_slot_name,
+                        Some(rank),
+                        true,
+                    );
+                    function.params.push(param);
+                    return Ok(true);
+                }
+                crate::schema::FragmentKind::Stmt => {
+                    let mut stmt = expect_stmt(node.take(), spec.public_name)?;
+                    assign_stmt_slot_and_rank(&mut stmt, spec.meta_slot_name, Some(rank), true)?;
+                    function.body.stmts.push(stmt);
+                    return Ok(true);
+                }
+                _ => {
+                    return Err(patch_error(
+                        "ranked function slot expected parameter or statement",
+                    ))
+                }
+            },
+            Item::Use(_) | Item::Doc(_) | Item::Comment(_) => unreachable!(),
         }
     }
 
@@ -134,13 +148,14 @@ fn insert_into_block(
 ) -> Result<bool, PatchError> {
     if let Some(meta) = &block.meta {
         if meta.id == owner_id {
-            if public_slot != "body" {
-                return Err(patch_error(&format!(
-                    "slot `@{owner_id}.{public_slot}` is not available for ranked insertion"
-                )));
-            }
-            let mut stmt = expect_stmt(node.take(), public_slot)?;
-            assign_stmt_slot_and_rank(&mut stmt, "body", Some(rank), true)?;
+            let spec = ranked_slot_spec(NodeKind::ExprBlock, public_slot).ok_or_else(|| {
+                patch_error(&invalid_ranked_slot_message(
+                    &format!("@{owner_id}"),
+                    public_slot,
+                ))
+            })?;
+            let mut stmt = expect_stmt(node.take(), spec.public_name)?;
+            assign_stmt_slot_and_rank(&mut stmt, spec.meta_slot_name, Some(rank), true)?;
             block.stmts.push(stmt);
             return Ok(true);
         }
@@ -183,24 +198,31 @@ fn insert_into_expr(
 ) -> Result<bool, PatchError> {
     if let Some(meta) = expr.meta() {
         if meta.id == owner_id {
+            let spec = ranked_slot_spec(expr_kind(expr), public_slot).ok_or_else(|| {
+                patch_error(&invalid_ranked_slot_message(
+                    &format!("@{owner_id}"),
+                    public_slot,
+                ))
+            })?;
             match expr {
-                Expr::Match(match_expr) if public_slot == "arms" => {
-                    let mut arm = expect_match_arm(node.take(), public_slot)?;
-                    assign_meta_slot_and_rank(&mut arm.meta, "arms", Some(rank), true);
+                Expr::Match(match_expr) => {
+                    let mut arm = expect_match_arm(node.take(), spec.public_name)?;
+                    assign_meta_slot_and_rank(&mut arm.meta, spec.meta_slot_name, Some(rank), true);
                     match_expr.arms.push(arm);
                     return Ok(true);
                 }
-                Expr::Block(block) if public_slot == "body" => {
-                    let mut stmt = expect_stmt(node.take(), public_slot)?;
-                    assign_stmt_slot_and_rank(&mut stmt, "body", Some(rank), true)?;
+                Expr::Block(block) => {
+                    let mut stmt = expect_stmt(node.take(), spec.public_name)?;
+                    assign_stmt_slot_and_rank(&mut stmt, spec.meta_slot_name, Some(rank), true)?;
                     block.stmts.push(stmt);
                     return Ok(true);
                 }
-                _ => {
-                    return Err(patch_error(&format!(
-                        "slot `@{owner_id}.{public_slot}` is not available for ranked insertion"
-                    )));
-                }
+                Expr::Path(_)
+                | Expr::Lit(_)
+                | Expr::Group(_)
+                | Expr::Binary(_)
+                | Expr::Unary(_)
+                | Expr::Call(_) => unreachable!(),
             }
         }
     }
