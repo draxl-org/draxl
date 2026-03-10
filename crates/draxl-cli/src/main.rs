@@ -4,7 +4,10 @@
 //! The CLI intentionally uses the public `draxl` facade rather than re-wiring
 //! parser, validator, printer, and lowering behavior itself.
 
-use draxl::{dump_json_source, format_source, lower_rust_source, parse_file, validate_file};
+use draxl::{
+    apply_patch_text, dump_json_source, format_file, format_source, lower_rust_source,
+    parse_and_validate, parse_file, validate_file,
+};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -81,6 +84,28 @@ fn run() -> Result<(), String> {
             );
             Ok(())
         }
+        "patch" => {
+            let first = args.next();
+            let (in_place, file_arg, patch_arg) = match first.as_deref() {
+                Some("--in-place") => (true, args.next(), args.next()),
+                _ => (false, first, args.next()),
+            };
+            let path = parse_path_arg(file_arg, "patch")?;
+            let patch_path = parse_path_arg(patch_arg, "patch")?;
+            let source = read_source(&path)?;
+            let mut file = parse_and_validate(&source).map_err(|err| err.to_string())?;
+            let patch_text = read_source(&patch_path)?;
+            apply_patch_text(&mut file, &patch_text).map_err(|err| err.to_string())?;
+            validate_file(&file).map_err(format_validation_errors)?;
+            let formatted = format_file(&file);
+            if in_place {
+                fs::write(&path, formatted)
+                    .map_err(|err| format!("failed to write {}: {err}", path.display()))?;
+            } else {
+                print!("{formatted}");
+            }
+            Ok(())
+        }
         _ => Err(usage()),
     }
 }
@@ -110,6 +135,7 @@ fn usage() -> String {
   draxl fmt [--in-place] <file>
   draxl dump-json <file>
   draxl validate <file>
-  draxl lower-rust <file>"
+  draxl lower-rust <file>
+  draxl patch [--in-place] <file> <patch-file>"
         .to_owned()
 }

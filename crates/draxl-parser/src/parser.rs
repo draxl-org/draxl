@@ -31,6 +31,121 @@ impl<'a> Parser<'a> {
         Ok(File { items })
     }
 
+    pub(crate) fn parse_item_fragment(&mut self) -> Result<Item, ParseError> {
+        let meta = self.parse_required_meta(None, "item fragment")?;
+        let item = self.parse_item_after_meta(meta)?;
+        self.expect_fragment_end("item fragment")?;
+        Ok(item)
+    }
+
+    pub(crate) fn parse_field_fragment(&mut self) -> Result<Field, ParseError> {
+        let mut meta = self.parse_required_meta(None, "field fragment")?;
+        let (name, _) = self.expect_ident("expected field name")?;
+        self.expect_simple(TokenKind::Colon, "expected `:` after field name")?;
+        let ty = self.parse_type()?;
+        let end = ty
+            .meta()
+            .span
+            .map(|span| span.end)
+            .unwrap_or(meta.span.unwrap().end);
+        set_meta_end(&mut meta, end);
+        self.expect_fragment_end("field fragment")?;
+        Ok(Field { meta, name, ty })
+    }
+
+    pub(crate) fn parse_variant_fragment(&mut self) -> Result<Variant, ParseError> {
+        let mut meta = self.parse_required_meta(None, "variant fragment")?;
+        let (name, end) = self.expect_ident("expected variant name")?;
+        set_meta_end(&mut meta, end);
+        self.expect_fragment_end("variant fragment")?;
+        Ok(Variant { meta, name })
+    }
+
+    pub(crate) fn parse_param_fragment(&mut self) -> Result<Param, ParseError> {
+        let mut meta = self.parse_required_meta(None, "parameter fragment")?;
+        let (name, _) = self.expect_ident("expected parameter name")?;
+        self.expect_simple(TokenKind::Colon, "expected `:` after parameter name")?;
+        let ty = self.parse_type()?;
+        let end = ty
+            .meta()
+            .span
+            .map(|span| span.end)
+            .unwrap_or(meta.span.unwrap().end);
+        set_meta_end(&mut meta, end);
+        self.expect_fragment_end("parameter fragment")?;
+        Ok(Param { meta, name, ty })
+    }
+
+    pub(crate) fn parse_stmt_fragment(&mut self) -> Result<Stmt, ParseError> {
+        let meta = self.parse_required_meta(None, "statement fragment")?;
+        let stmt = match self.current_kind() {
+            TokenKind::DocComment(_) => Stmt::Doc(self.parse_doc_node(meta)?),
+            TokenKind::LineComment(_) => Stmt::Comment(self.parse_comment_node(meta)?),
+            TokenKind::Mod
+            | TokenKind::Use
+            | TokenKind::Struct
+            | TokenKind::Enum
+            | TokenKind::Fn => Stmt::Item(self.parse_item_after_meta(meta)?),
+            TokenKind::Let => self.parse_let_stmt_after_meta(meta)?,
+            _ => self.parse_expr_stmt_after_meta(meta)?,
+        };
+        self.expect_fragment_end("statement fragment")?;
+        Ok(stmt)
+    }
+
+    pub(crate) fn parse_match_arm_fragment(&mut self) -> Result<MatchArm, ParseError> {
+        let mut meta = self.parse_required_meta(None, "match arm fragment")?;
+        let (pat, _) = self.parse_pattern()?;
+        let guard = if self.check_simple(&TokenKind::If) {
+            self.bump();
+            Some(self.parse_expr()?.0)
+        } else {
+            None
+        };
+        self.expect_simple(TokenKind::FatArrow, "expected `=>` in match arm")?;
+        let (body, body_end) = self.parse_expr()?;
+        set_meta_end(&mut meta, body_end);
+        self.expect_fragment_end("match arm fragment")?;
+        Ok(MatchArm {
+            meta,
+            pat,
+            guard,
+            body,
+        })
+    }
+
+    pub(crate) fn parse_expr_fragment(&mut self) -> Result<Expr, ParseError> {
+        let expr = self.parse_expr()?.0;
+        self.expect_fragment_end("expression fragment")?;
+        Ok(expr)
+    }
+
+    pub(crate) fn parse_type_fragment(&mut self) -> Result<Type, ParseError> {
+        let ty = self.parse_type()?;
+        self.expect_fragment_end("type fragment")?;
+        Ok(ty)
+    }
+
+    pub(crate) fn parse_pattern_fragment(&mut self) -> Result<Pattern, ParseError> {
+        let pattern = self.parse_pattern()?.0;
+        self.expect_fragment_end("pattern fragment")?;
+        Ok(pattern)
+    }
+
+    pub(crate) fn parse_doc_fragment(&mut self) -> Result<DocNode, ParseError> {
+        let meta = self.parse_required_meta(None, "doc fragment")?;
+        let doc = self.parse_doc_node(meta)?;
+        self.expect_fragment_end("doc fragment")?;
+        Ok(doc)
+    }
+
+    pub(crate) fn parse_comment_fragment(&mut self) -> Result<CommentNode, ParseError> {
+        let meta = self.parse_required_meta(None, "comment fragment")?;
+        let comment = self.parse_comment_node(meta)?;
+        self.expect_fragment_end("comment fragment")?;
+        Ok(comment)
+    }
+
     fn parse_item(&mut self, slot: &str) -> Result<Item, ParseError> {
         let meta = self.parse_required_meta(Some(slot), "item")?;
         self.parse_item_after_meta(meta)
@@ -758,6 +873,14 @@ impl<'a> Parser<'a> {
                 Ok((value, end))
             }
             _ => Err(self.error_previous(message)),
+        }
+    }
+
+    fn expect_fragment_end(&self, context: &str) -> Result<(), ParseError> {
+        if self.at_eof() {
+            Ok(())
+        } else {
+            Err(self.error_current(&format!("unexpected trailing tokens after {context}")))
         }
     }
 

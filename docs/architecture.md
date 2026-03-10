@@ -111,6 +111,7 @@ represented by the AST.
 
 The patch crate applies structured edit operators over the AST:
 
+- parse and resolve canonical textual patch streams
 - insert into ranked slots
 - put into single-child slots
 - replace node bodies while preserving outer identity
@@ -131,6 +132,7 @@ workflows exposed to users:
 - `dump-json`
 - `validate`
 - `lower-rust`
+- `patch`
 
 ## Design choices
 

@@ -6,7 +6,7 @@ Patch operations address stable node ids, schema-defined slot names, attachment
 relations, and scalar field paths. That makes patch application resilient to
 surrounding formatting changes and explicit about semantic intent.
 
-For the canonical textual notation used in docs and future tooling, see
+For the canonical textual notation used in docs, the Rust API, and the CLI, see
 [patch-op-syntax.md](patch-op-syntax.md). This document focuses on the semantic
 model and the current Rust API behavior.
 
@@ -108,11 +108,13 @@ bespoke rename or metadata verbs.
 
 ## Current implementation boundary
 
-The current executor supports the modeled Rust profile through the structured
-Rust API. The canonical textual syntax is documented, but not parsed yet.
+The current executor supports the modeled Rust profile through both the
+structured Rust API and the canonical textual patch surface.
 
 Supported today:
 
+- textual patch parsing and schema-backed resolution through `draxl-patch`,
+  `draxl`, and `draxl patch`
 - `insert` into ranked `items`, `fields`, `variants`, `params`, `body`, and
   `arms` slots
 - `put` into the current modeled single-child slots such as `ret`, `ty`, `pat`,
@@ -129,7 +131,6 @@ Supported today:
 
 Not implemented yet:
 
-- parsing the canonical textual patch stream
 - profile metadata paths beyond the currently modeled scalar subset
 - patching over AST regions that the current Rust profile does not model with
   stable ids or legal destination slots

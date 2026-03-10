@@ -1,7 +1,11 @@
 # Patch Text Execution TODO
 
-This document turns the current "canonical patch notation" into an executable
-implementation plan.
+This document originally turned the canonical patch notation into an
+implementation plan. The core textual patch surface is now executable through
+the Rust API and CLI for the current modeled Rust profile.
+
+The remaining notes here are best read as follow-up cleanup and extension work,
+not as a statement that patch-text execution is still missing.
 
 The goal is not to bypass the existing structured patch model. The goal is:
 
@@ -14,8 +18,9 @@ typed executor as the resolved backend.
 
 ## Goal
 
-Make the canonical textual patch notation in [patch-op-syntax.md](patch-op-syntax.md)
-executable for the current Rust profile.
+Keep the canonical textual patch notation in
+[patch-op-syntax.md](patch-op-syntax.md) executable and schema-backed for the
+current Rust profile.
 
 At the end of this work, users should be able to:
 

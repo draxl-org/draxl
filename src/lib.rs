@@ -149,3 +149,26 @@ pub fn apply_patches(
 ) -> std::result::Result<(), patch::PatchError> {
     patch::apply_ops(file, ops)
 }
+
+/// Parses canonical textual patch ops into unresolved surface ops.
+pub fn parse_patch_ops(
+    source: &str,
+) -> std::result::Result<Vec<patch::SurfacePatchOp>, patch::PatchTextError> {
+    patch::parse_patch_ops(source)
+}
+
+/// Resolves textual patch ops against the current file.
+pub fn resolve_patch_ops(
+    file: &ast::File,
+    source: &str,
+) -> std::result::Result<Vec<patch::PatchOp>, patch::PatchTextError> {
+    patch::resolve_patch_ops(file, source)
+}
+
+/// Parses, resolves, and applies textual patch ops in order.
+pub fn apply_patch_text(
+    file: &mut ast::File,
+    source: &str,
+) -> std::result::Result<(), patch::PatchTextError> {
+    patch::apply_patch_text(file, source)
+}

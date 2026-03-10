@@ -85,6 +85,60 @@ fn validate_command_reports_errors_on_invalid_input() {
     assert!(output.contains("missing `rank`"));
 }
 
+#[test]
+fn patch_command_applies_textual_patch_ops() {
+    let source_path = write_temp_file(
+        "patch_source.rs.dx",
+        r#"
+@m1 mod demo {
+  @f1[a] fn first() {}
+}
+"#,
+    );
+    let patch_path = write_temp_file(
+        "patch_ops.dxpatch",
+        r#"
+set @f1.name = renamed_first
+"#,
+    );
+
+    let output = run_ok(&[
+        "patch",
+        source_path.to_str().unwrap(),
+        patch_path.to_str().unwrap(),
+    ]);
+
+    assert!(output.contains("fn renamed_first()"));
+}
+
+#[test]
+fn patch_in_place_rewrites_the_file() {
+    let source_path = write_temp_file(
+        "patch_in_place.rs.dx",
+        r#"
+@m1 mod demo {
+  @f1[a] fn first() {}
+}
+"#,
+    );
+    let patch_path = write_temp_file(
+        "patch_in_place.dxpatch",
+        r#"
+set @f1.name = renamed_first
+"#,
+    );
+
+    run_ok(&[
+        "patch",
+        "--in-place",
+        source_path.to_str().unwrap(),
+        patch_path.to_str().unwrap(),
+    ]);
+
+    let rewritten = fs::read_to_string(&source_path).expect("temporary file should be readable");
+    assert!(rewritten.contains("fn renamed_first()"));
+}
+
 fn run_ok(args: &[&str]) -> String {
     let output = Command::new(binary_path())
         .args(args)

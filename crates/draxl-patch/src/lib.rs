@@ -9,9 +9,15 @@
 mod apply;
 mod error;
 mod model;
+mod text;
 
 pub use apply::{apply_op, apply_ops};
 pub use error::PatchError;
 pub use model::{
     PatchDest, PatchNode, PatchOp, PatchPath, PatchValue, RankedDest, SlotOwner, SlotRef,
+};
+pub use text::{
+    apply_patch_text, parse_patch_ops, resolve_patch_ops, PatchTextError, SurfaceDest,
+    SurfaceFragment, SurfaceNodeRef, SurfacePatchOp, SurfacePath, SurfacePathSegment,
+    SurfaceRankedDest, SurfaceSlotOwner, SurfaceSlotRef, SurfaceValue, SurfaceValueKind,
 };

@@ -177,8 +177,8 @@ changed: insert a new statement into `@f1.body` and replace the expression node
 `@e3`. As long as those ids survive, the edits remain targetable through
 formatting, nearby inserts, and many refactors.
 
-The structured Rust API already uses this semantic model. The textual notation
-shown here mirrors that model, but it is not parsed by the CLI yet.
+The structured Rust API and `draxl patch` both execute this textual patch
+surface directly.
 
 The same model can also express edits that are awkward in unified diffs, such
 as `attach @d2 -> @f1`, `move @s2 -> @f1.body[ah]`, or `set @f1.name = run`.

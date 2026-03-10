@@ -5,15 +5,13 @@ operations.
 
 ## Status
 
-This is the canonical notation for docs, logs, patch streams, and future
-tooling.
-
-The current Rust executor already follows this semantic model through structured
-`PatchOp` values. Parsing the textual surface itself is still future work.
+This is the canonical notation for docs, logs, patch streams, the Rust API, and
+the CLI.
 
 ## Grammar
 
 ```text
+stream      := (blank_line* op blank_line*)*
 op          := insert | put | replace | delete | move | set | clear | attach | detach
 
 insert      := "insert" ranked_dest ":" fragment
@@ -32,6 +30,7 @@ slot_ref    := owner "." slot
 owner       := "file" | node_ref
 path        := node_ref ("." ident)+
 node_ref    := "@" ident
+value       := ident | string | int | "true" | "false"
 ```
 
 ## Addressing
@@ -83,6 +82,9 @@ Rules:
 - `replace` fragments rewrite the node body and must not carry competing outer
   rank, slot, or anchor metadata
 - `replace` preserves the target node identity and outer placement
+- fragment parsing respects balanced parens, braces, and brackets across
+  multiple lines
+- blank lines may separate patch ops in a stream
 
 ## Semantics
 
@@ -125,7 +127,7 @@ not arbitrary graph-edge edits.
 ## Examples
 
 ```text
-replace @e2: (@e9 x * @l2 2)
+replace @e2: (@e2 x * @l2 2)
 
 insert @f1.body[ah]: @s4 @e4 trace();
 
@@ -144,6 +146,5 @@ detach @d2
 
 ## Current implementation boundary
 
-The current executor supports the semantic model above through the structured
-Rust API over the modeled Rust profile. The textual syntax in this document is
-canonical, but not parsed yet.
+The current Rust profile parses, resolves, and executes this textual syntax
+through `draxl-patch`, the root `draxl` facade, and `draxl patch`.
