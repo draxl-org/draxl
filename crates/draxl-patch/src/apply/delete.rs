@@ -3,6 +3,9 @@ use super::support::{
     resolved_stmt_attachment_targets, stmt_id,
 };
 use crate::error::{patch_error, PatchError};
+use crate::schema::{
+    removable_slot_spec, required_slot_error_message, unsupported_slot_error_message, NodeKind,
+};
 use draxl_ast::{Block, Expr, Field, File, Item, MatchArm, Param, Stmt, Variant};
 
 pub(super) fn apply_delete(file: &mut File, target_id: &str) -> Result<(), PatchError> {
@@ -36,7 +39,7 @@ fn delete_in_item(item: &mut Item, target_id: &str) -> Result<bool, PatchError> 
             }
             for field in &mut strukt.fields {
                 if field.ty.meta().id == target_id {
-                    return Err(required_slot_error(target_id, "ty"));
+                    return removable_child_error("delete", target_id, NodeKind::Field, "ty");
                 }
             }
             Ok(false)
@@ -48,7 +51,7 @@ fn delete_in_item(item: &mut Item, target_id: &str) -> Result<bool, PatchError> 
             }
             for param in &mut function.params {
                 if param.ty.meta().id == target_id {
-                    return Err(required_slot_error(target_id, "ty"));
+                    return removable_child_error("delete", target_id, NodeKind::Param, "ty");
                 }
             }
             if function
@@ -56,6 +59,7 @@ fn delete_in_item(item: &mut Item, target_id: &str) -> Result<bool, PatchError> 
                 .as_ref()
                 .is_some_and(|ret_ty| ret_ty.meta().id == target_id)
             {
+                removable_child_error("delete", target_id, NodeKind::Fn, "ret")?;
                 function.ret_ty = None;
                 return Ok(true);
             }
@@ -81,16 +85,16 @@ fn delete_in_stmt(stmt: &mut Stmt, target_id: &str) -> Result<bool, PatchError> 
     match stmt {
         Stmt::Let(let_stmt) => {
             if pattern_id(&let_stmt.pat).is_some_and(|id| id == target_id) {
-                return Err(required_slot_error(target_id, "pat"));
+                return removable_child_error("delete", target_id, NodeKind::LetStmt, "pat");
             }
             if expr_id(&let_stmt.value).is_some_and(|id| id == target_id) {
-                return Err(required_slot_error(target_id, "init"));
+                return removable_child_error("delete", target_id, NodeKind::LetStmt, "init");
             }
             delete_in_expr(&mut let_stmt.value, target_id)
         }
         Stmt::Expr(expr_stmt) => {
             if expr_id(&expr_stmt.expr).is_some_and(|id| id == target_id) {
-                return Err(required_slot_error(target_id, "expr"));
+                return removable_child_error("delete", target_id, NodeKind::ExprStmt, "expr");
             }
             delete_in_expr(&mut expr_stmt.expr, target_id)
         }
@@ -103,16 +107,16 @@ fn delete_in_expr(expr: &mut Expr, target_id: &str) -> Result<bool, PatchError> 
     match expr {
         Expr::Group(group) => {
             if expr_id(&group.expr).is_some_and(|id| id == target_id) {
-                return Err(required_slot_error(target_id, "expr"));
+                return removable_child_error("delete", target_id, NodeKind::ExprGroup, "expr");
             }
             delete_in_expr(&mut group.expr, target_id)
         }
         Expr::Binary(binary) => {
             if expr_id(&binary.lhs).is_some_and(|id| id == target_id) {
-                return Err(required_slot_error(target_id, "lhs"));
+                return removable_child_error("delete", target_id, NodeKind::ExprBinary, "lhs");
             }
             if expr_id(&binary.rhs).is_some_and(|id| id == target_id) {
-                return Err(required_slot_error(target_id, "rhs"));
+                return removable_child_error("delete", target_id, NodeKind::ExprBinary, "rhs");
             }
             if delete_in_expr(&mut binary.lhs, target_id)? {
                 return Ok(true);
@@ -121,22 +125,20 @@ fn delete_in_expr(expr: &mut Expr, target_id: &str) -> Result<bool, PatchError> 
         }
         Expr::Unary(unary) => {
             if expr_id(&unary.expr).is_some_and(|id| id == target_id) {
-                return Err(required_slot_error(target_id, "expr"));
+                return removable_child_error("delete", target_id, NodeKind::ExprUnary, "expr");
             }
             delete_in_expr(&mut unary.expr, target_id)
         }
         Expr::Call(call) => {
             if expr_id(&call.callee).is_some_and(|id| id == target_id) {
-                return Err(required_slot_error(target_id, "callee"));
+                return removable_child_error("delete", target_id, NodeKind::ExprCall, "callee");
             }
             if delete_in_expr(&mut call.callee, target_id)? {
                 return Ok(true);
             }
             for arg in &mut call.args {
                 if expr_id(arg).is_some_and(|id| id == target_id) {
-                    return Err(patch_error(&format!(
-                        "delete target `{target_id}` is in unsupported slot `args`"
-                    )));
+                    return removable_child_error("delete", target_id, NodeKind::ExprCall, "args");
                 }
                 if delete_in_expr(arg, target_id)? {
                     return Ok(true);
@@ -149,7 +151,12 @@ fn delete_in_expr(expr: &mut Expr, target_id: &str) -> Result<bool, PatchError> 
                 return Ok(true);
             }
             if expr_id(&match_expr.scrutinee).is_some_and(|id| id == target_id) {
-                return Err(required_slot_error(target_id, "scrutinee"));
+                return removable_child_error(
+                    "delete",
+                    target_id,
+                    NodeKind::ExprMatch,
+                    "scrutinee",
+                );
             }
             if delete_in_expr(&mut match_expr.scrutinee, target_id)? {
                 return Ok(true);
@@ -168,13 +175,14 @@ fn delete_in_expr(expr: &mut Expr, target_id: &str) -> Result<bool, PatchError> 
 
 fn delete_in_match_arm(arm: &mut MatchArm, target_id: &str) -> Result<bool, PatchError> {
     if pattern_id(&arm.pat).is_some_and(|id| id == target_id) {
-        return Err(required_slot_error(target_id, "pat"));
+        return removable_child_error("delete", target_id, NodeKind::MatchArm, "pat");
     }
     if arm
         .guard
         .as_ref()
         .is_some_and(|guard| expr_id(guard).is_some_and(|id| id == target_id))
     {
+        removable_child_error("delete", target_id, NodeKind::MatchArm, "guard")?;
         arm.guard = None;
         return Ok(true);
     }
@@ -184,7 +192,7 @@ fn delete_in_match_arm(arm: &mut MatchArm, target_id: &str) -> Result<bool, Patc
         }
     }
     if expr_id(&arm.body).is_some_and(|id| id == target_id) {
-        return Err(required_slot_error(target_id, "body"));
+        return removable_child_error("delete", target_id, NodeKind::MatchArm, "body");
     }
     delete_in_expr(&mut arm.body, target_id)
 }
@@ -273,8 +281,21 @@ fn delete_match_arm_vec(arms: &mut Vec<MatchArm>, target_id: &str) -> bool {
     }
 }
 
-fn required_slot_error(target_id: &str, slot: &str) -> PatchError {
-    patch_error(&format!(
-        "delete target `{target_id}` would leave required slot `{slot}` empty"
-    ))
+fn removable_child_error(
+    action: &str,
+    target_id: &str,
+    owner_kind: NodeKind,
+    slot: &str,
+) -> Result<bool, PatchError> {
+    match removable_slot_spec(owner_kind, slot) {
+        Some(_) => Ok(true),
+        None => {
+            let message = if crate::schema::slot_spec(owner_kind, slot).is_some() {
+                required_slot_error_message(action, target_id, slot)
+            } else {
+                unsupported_slot_error_message(action, target_id, slot)
+            };
+            Err(patch_error(&message))
+        }
+    }
 }

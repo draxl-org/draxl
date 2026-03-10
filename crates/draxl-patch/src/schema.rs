@@ -58,11 +58,18 @@ pub(crate) enum SlotArity {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AttachmentContainerKind {
+    Items,
+    Stmts,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SlotSpec {
     pub public_name: &'static str,
     pub meta_slot_name: &'static str,
     pub fragment_kind: FragmentKind,
     pub arity: SlotArity,
+    pub occupant_removable: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -79,120 +86,140 @@ pub(crate) fn slot_spec(owner: NodeKind, slot: &str) -> Option<SlotSpec> {
             meta_slot_name: "file_items",
             fragment_kind: FragmentKind::Item,
             arity: SlotArity::Ranked,
+            occupant_removable: true,
         }),
         (NodeKind::Mod, "items") => Some(SlotSpec {
             public_name: "items",
             meta_slot_name: "items",
             fragment_kind: FragmentKind::Item,
             arity: SlotArity::Ranked,
+            occupant_removable: true,
         }),
         (NodeKind::Struct, "fields") => Some(SlotSpec {
             public_name: "fields",
             meta_slot_name: "fields",
             fragment_kind: FragmentKind::Field,
             arity: SlotArity::Ranked,
+            occupant_removable: true,
         }),
         (NodeKind::Enum, "variants") => Some(SlotSpec {
             public_name: "variants",
             meta_slot_name: "variants",
             fragment_kind: FragmentKind::Variant,
             arity: SlotArity::Ranked,
+            occupant_removable: true,
         }),
         (NodeKind::Fn, "params") => Some(SlotSpec {
             public_name: "params",
             meta_slot_name: "params",
             fragment_kind: FragmentKind::Param,
             arity: SlotArity::Ranked,
+            occupant_removable: true,
         }),
         (NodeKind::Fn, "body") | (NodeKind::ExprBlock, "body") => Some(SlotSpec {
             public_name: "body",
             meta_slot_name: "body",
             fragment_kind: FragmentKind::Stmt,
             arity: SlotArity::Ranked,
+            occupant_removable: true,
         }),
         (NodeKind::ExprMatch, "arms") => Some(SlotSpec {
             public_name: "arms",
             meta_slot_name: "arms",
             fragment_kind: FragmentKind::MatchArm,
             arity: SlotArity::Ranked,
+            occupant_removable: true,
         }),
         (NodeKind::Fn, "ret") => Some(SlotSpec {
             public_name: "ret",
             meta_slot_name: "ret",
             fragment_kind: FragmentKind::Type,
             arity: SlotArity::Single,
+            occupant_removable: true,
         }),
         (NodeKind::Field, "ty") | (NodeKind::Param, "ty") => Some(SlotSpec {
             public_name: "ty",
             meta_slot_name: "ty",
             fragment_kind: FragmentKind::Type,
             arity: SlotArity::Single,
+            occupant_removable: false,
         }),
         (NodeKind::LetStmt, "pat") => Some(SlotSpec {
             public_name: "pat",
             meta_slot_name: "pat",
             fragment_kind: FragmentKind::Pattern,
             arity: SlotArity::Single,
+            occupant_removable: false,
         }),
         (NodeKind::LetStmt, "init") => Some(SlotSpec {
             public_name: "init",
             meta_slot_name: "init",
             fragment_kind: FragmentKind::Expr,
             arity: SlotArity::Single,
+            occupant_removable: false,
         }),
         (NodeKind::ExprStmt, "expr") => Some(SlotSpec {
             public_name: "expr",
             meta_slot_name: "expr",
             fragment_kind: FragmentKind::Expr,
             arity: SlotArity::Single,
+            occupant_removable: false,
         }),
         (NodeKind::ExprGroup, "expr") | (NodeKind::ExprUnary, "expr") => Some(SlotSpec {
             public_name: "expr",
             meta_slot_name: "expr",
             fragment_kind: FragmentKind::Expr,
             arity: SlotArity::Single,
+            occupant_removable: false,
         }),
         (NodeKind::ExprBinary, "lhs") => Some(SlotSpec {
             public_name: "lhs",
             meta_slot_name: "lhs",
             fragment_kind: FragmentKind::Expr,
             arity: SlotArity::Single,
+            occupant_removable: false,
         }),
         (NodeKind::ExprBinary, "rhs") => Some(SlotSpec {
             public_name: "rhs",
             meta_slot_name: "rhs",
             fragment_kind: FragmentKind::Expr,
             arity: SlotArity::Single,
+            occupant_removable: false,
         }),
         (NodeKind::ExprCall, "callee") => Some(SlotSpec {
             public_name: "callee",
             meta_slot_name: "callee",
             fragment_kind: FragmentKind::Expr,
             arity: SlotArity::Single,
+            occupant_removable: false,
         }),
         (NodeKind::ExprMatch, "scrutinee") => Some(SlotSpec {
             public_name: "scrutinee",
             meta_slot_name: "scrutinee",
             fragment_kind: FragmentKind::Expr,
             arity: SlotArity::Single,
+            occupant_removable: false,
         }),
         (NodeKind::MatchArm, "pat") => Some(SlotSpec {
             public_name: "pat",
             meta_slot_name: "pat",
             fragment_kind: FragmentKind::Pattern,
             arity: SlotArity::Single,
+            occupant_removable: false,
         }),
         (NodeKind::MatchArm, "guard") => Some(SlotSpec {
             public_name: "guard",
             meta_slot_name: "guard",
             fragment_kind: FragmentKind::Expr,
             arity: SlotArity::Single,
+            occupant_removable: true,
         }),
         (NodeKind::MatchArm, "body") => Some(SlotSpec {
             public_name: "body",
             meta_slot_name: "body",
             fragment_kind: FragmentKind::Expr,
             arity: SlotArity::Single,
+            occupant_removable: false,
         }),
         _ => None,
     }
@@ -204,6 +231,10 @@ pub(crate) fn ranked_slot_spec(owner: NodeKind, slot: &str) -> Option<SlotSpec> 
 
 pub(crate) fn single_slot_spec(owner: NodeKind, slot: &str) -> Option<SlotSpec> {
     slot_spec(owner, slot).filter(|spec| spec.arity == SlotArity::Single)
+}
+
+pub(crate) fn removable_slot_spec(owner: NodeKind, slot: &str) -> Option<SlotSpec> {
+    slot_spec(owner, slot).filter(|spec| spec.occupant_removable)
 }
 
 pub(crate) fn path_spec(kind: NodeKind, path: &str) -> Option<PathSpec> {
@@ -354,6 +385,46 @@ pub(crate) fn value_kind_label(value_kind: ValueKind) -> &'static str {
     }
 }
 
+pub(crate) fn attachment_container_kind_for_owner(
+    kind: NodeKind,
+) -> Option<AttachmentContainerKind> {
+    match kind {
+        NodeKind::File | NodeKind::Mod => Some(AttachmentContainerKind::Items),
+        NodeKind::Fn | NodeKind::ExprBlock => Some(AttachmentContainerKind::Stmts),
+        _ => None,
+    }
+}
+
+pub(crate) fn attachment_closure_allowed(
+    owner_kind: NodeKind,
+    slot: &str,
+    closure_kind: AttachmentContainerKind,
+) -> bool {
+    let Some(spec) = ranked_slot_spec(owner_kind, slot) else {
+        return false;
+    };
+    matches!(
+        (
+            closure_kind,
+            attachment_container_kind_for_owner(owner_kind),
+            spec.fragment_kind
+        ),
+        (
+            AttachmentContainerKind::Items,
+            Some(AttachmentContainerKind::Items),
+            FragmentKind::Item
+        ) | (
+            AttachmentContainerKind::Stmts,
+            Some(AttachmentContainerKind::Stmts),
+            FragmentKind::Stmt
+        )
+    )
+}
+
+pub(crate) fn is_attachable_kind(kind: NodeKind) -> bool {
+    matches!(kind, NodeKind::Doc | NodeKind::Comment)
+}
+
 pub(crate) fn invalid_ranked_slot_message(owner_label: &str, slot: &str) -> String {
     format!("slot `{owner_label}.{slot}` is not available for ranked insertion")
 }
@@ -374,6 +445,63 @@ pub(crate) fn invalid_clear_path_message(node_id: &str, path: &str, kind: NodeKi
         "path `@{node_id}.{path}` is not clearable on {}",
         node_kind_label(kind)
     )
+}
+
+pub(crate) fn required_slot_error_message(action: &str, target_id: &str, slot: &str) -> String {
+    format!(
+        "{} target `{}` cannot be removed from required slot `{}`",
+        action, target_id, slot
+    )
+}
+
+pub(crate) fn unsupported_slot_error_message(action: &str, target_id: &str, slot: &str) -> String {
+    format!(
+        "{} target `{}` is in unsupported slot `{}`",
+        action, target_id, slot
+    )
+}
+
+pub(crate) fn trivia_move_target_message() -> &'static str {
+    "move does not support doc or comment targets; use attach, detach, replace, or delete"
+}
+
+pub(crate) fn single_slot_attachment_closure_message() -> &'static str {
+    "cannot move a node with attached docs/comments into a single-child slot"
+}
+
+pub(crate) fn invalid_attachment_closure_destination_message(
+    closure_kind: AttachmentContainerKind,
+) -> &'static str {
+    match closure_kind {
+        AttachmentContainerKind::Items => {
+            "cannot move item attachments into a non-item ranked slot"
+        }
+        AttachmentContainerKind::Stmts => {
+            "cannot move statement attachments into a non-body ranked slot"
+        }
+    }
+}
+
+pub(crate) fn invalid_attachment_container_owner_message(
+    owner_label: &str,
+    closure_kind: AttachmentContainerKind,
+) -> String {
+    match closure_kind {
+        AttachmentContainerKind::Items => {
+            format!("owner `{owner_label}` does not expose an item attachment container")
+        }
+        AttachmentContainerKind::Stmts => {
+            format!("owner `{owner_label}` does not expose a statement body slot")
+        }
+    }
+}
+
+pub(crate) fn attach_target_not_sibling_message(target_id: &str, node_id: &str) -> String {
+    format!("attach target `{target_id}` is not a sibling semantic node for `{node_id}`")
+}
+
+pub(crate) fn detach_requires_following_sibling_message(node_id: &str) -> String {
+    format!("detach source `{node_id}` needs a following sibling semantic node")
 }
 
 pub(crate) fn find_node_kind(file: &File, node_id: &str) -> Option<NodeKind> {

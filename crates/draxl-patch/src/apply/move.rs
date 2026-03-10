@@ -1,11 +1,18 @@
 use super::support::{
     assign_item_slot_and_rank, assign_stmt_slot_and_rank, clear_patch_node_outer_placement,
     expr_id, is_item_trivia, is_stmt_trivia, pattern_id, resolved_item_attachment_targets,
-    resolved_stmt_attachment_targets, stmt_id,
+    resolved_stmt_attachment_targets, slot_owner_label, stmt_id,
 };
 use super::{insert, put};
 use crate::error::{patch_error, PatchError};
 use crate::model::{PatchDest, PatchNode, RankedDest, SlotOwner};
+use crate::schema::{
+    attachment_closure_allowed, attachment_container_kind_for_owner, find_node_kind,
+    invalid_attachment_closure_destination_message, invalid_attachment_container_owner_message,
+    removable_slot_spec, required_slot_error_message, single_slot_attachment_closure_message,
+    slot_spec, trivia_move_target_message, unsupported_slot_error_message, AttachmentContainerKind,
+    NodeKind,
+};
 use draxl_ast::{Block, Expr, File, Item, MatchArm, Stmt};
 
 pub(super) fn apply_move(
@@ -23,9 +30,7 @@ pub(super) fn apply_move(
         PatchDest::Ranked(dest) => insert::apply_insert(&mut working, dest, extracted.node)?,
         PatchDest::Slot(slot) => {
             if extracted.closure.is_some() {
-                return Err(patch_error(
-                    "cannot move a node with attached docs/comments into a single-child slot",
-                ));
+                return Err(patch_error(single_slot_attachment_closure_message()));
             }
             put::apply_put(&mut working, slot, extracted.node)?;
         }
@@ -55,9 +60,7 @@ fn extract_from_items(
 ) -> Result<Option<ExtractedNode>, PatchError> {
     if let Some(index) = items.iter().position(|item| item.meta().id == target_id) {
         if is_item_trivia(&items[index]) {
-            return Err(patch_error(
-                "move does not support doc or comment targets; use attach, detach, replace, or delete",
-            ));
+            return Err(patch_error(trivia_move_target_message()));
         }
 
         let attachment_targets = resolved_item_attachment_targets(items);
@@ -110,7 +113,7 @@ fn extract_from_item(
             }
             for field in &strukt.fields {
                 if field.ty.meta().id == target_id {
-                    return Err(required_source_error(target_id, "ty"));
+                    return removable_source_error(target_id, NodeKind::Field, "ty");
                 }
             }
             Ok(None)
@@ -141,7 +144,7 @@ fn extract_from_item(
             }
             for param in &function.params {
                 if param.ty.meta().id == target_id {
-                    return Err(required_source_error(target_id, "ty"));
+                    return removable_source_error(target_id, NodeKind::Param, "ty");
                 }
             }
             if function
@@ -149,6 +152,7 @@ fn extract_from_item(
                 .as_ref()
                 .is_some_and(|ret_ty| ret_ty.meta().id == target_id)
             {
+                ensure_removable_source(target_id, NodeKind::Fn, "ret")?;
                 return Ok(Some(ExtractedNode {
                     node: PatchNode::Type(
                         function
@@ -175,9 +179,7 @@ fn extract_from_block(
         .position(|stmt| stmt_id(stmt).is_some_and(|id| id == target_id))
     {
         if is_stmt_trivia(&block.stmts[index]) {
-            return Err(patch_error(
-                "move does not support doc or comment targets; use attach, detach, replace, or delete",
-            ));
+            return Err(patch_error(trivia_move_target_message()));
         }
 
         let attachment_targets = resolved_stmt_attachment_targets(&block.stmts);
@@ -218,16 +220,16 @@ fn extract_from_stmt(
     match stmt {
         Stmt::Let(let_stmt) => {
             if pattern_id(&let_stmt.pat).is_some_and(|id| id == target_id) {
-                return Err(required_source_error(target_id, "pat"));
+                return removable_source_error(target_id, NodeKind::LetStmt, "pat");
             }
             if expr_id(&let_stmt.value).is_some_and(|id| id == target_id) {
-                return Err(required_source_error(target_id, "init"));
+                return removable_source_error(target_id, NodeKind::LetStmt, "init");
             }
             extract_from_expr(&mut let_stmt.value, target_id)
         }
         Stmt::Expr(expr_stmt) => {
             if expr_id(&expr_stmt.expr).is_some_and(|id| id == target_id) {
-                return Err(required_source_error(target_id, "expr"));
+                return removable_source_error(target_id, NodeKind::ExprStmt, "expr");
             }
             extract_from_expr(&mut expr_stmt.expr, target_id)
         }
@@ -243,16 +245,16 @@ fn extract_from_expr(
     match expr {
         Expr::Group(group) => {
             if expr_id(&group.expr).is_some_and(|id| id == target_id) {
-                return Err(required_source_error(target_id, "expr"));
+                return removable_source_error(target_id, NodeKind::ExprGroup, "expr");
             }
             extract_from_expr(&mut group.expr, target_id)
         }
         Expr::Binary(binary) => {
             if expr_id(&binary.lhs).is_some_and(|id| id == target_id) {
-                return Err(required_source_error(target_id, "lhs"));
+                return removable_source_error(target_id, NodeKind::ExprBinary, "lhs");
             }
             if expr_id(&binary.rhs).is_some_and(|id| id == target_id) {
-                return Err(required_source_error(target_id, "rhs"));
+                return removable_source_error(target_id, NodeKind::ExprBinary, "rhs");
             }
             if let Some(extracted) = extract_from_expr(&mut binary.lhs, target_id)? {
                 return Ok(Some(extracted));
@@ -261,22 +263,20 @@ fn extract_from_expr(
         }
         Expr::Unary(unary) => {
             if expr_id(&unary.expr).is_some_and(|id| id == target_id) {
-                return Err(required_source_error(target_id, "expr"));
+                return removable_source_error(target_id, NodeKind::ExprUnary, "expr");
             }
             extract_from_expr(&mut unary.expr, target_id)
         }
         Expr::Call(call) => {
             if expr_id(&call.callee).is_some_and(|id| id == target_id) {
-                return Err(required_source_error(target_id, "callee"));
+                return removable_source_error(target_id, NodeKind::ExprCall, "callee");
             }
             if let Some(extracted) = extract_from_expr(&mut call.callee, target_id)? {
                 return Ok(Some(extracted));
             }
             for arg in &mut call.args {
                 if expr_id(arg).is_some_and(|id| id == target_id) {
-                    return Err(patch_error(&format!(
-                        "move target `{target_id}` is in unsupported slot `args`"
-                    )));
+                    return removable_source_error(target_id, NodeKind::ExprCall, "args");
                 }
                 if let Some(extracted) = extract_from_expr(arg, target_id)? {
                     return Ok(Some(extracted));
@@ -296,7 +296,7 @@ fn extract_from_expr(
                 }));
             }
             if expr_id(&match_expr.scrutinee).is_some_and(|id| id == target_id) {
-                return Err(required_source_error(target_id, "scrutinee"));
+                return removable_source_error(target_id, NodeKind::ExprMatch, "scrutinee");
             }
             if let Some(extracted) = extract_from_expr(&mut match_expr.scrutinee, target_id)? {
                 return Ok(Some(extracted));
@@ -318,13 +318,14 @@ fn extract_from_match_arm(
     target_id: &str,
 ) -> Result<Option<ExtractedNode>, PatchError> {
     if pattern_id(&arm.pat).is_some_and(|id| id == target_id) {
-        return Err(required_source_error(target_id, "pat"));
+        return removable_source_error(target_id, NodeKind::MatchArm, "pat");
     }
     if arm
         .guard
         .as_ref()
         .is_some_and(|guard| expr_id(guard).is_some_and(|id| id == target_id))
     {
+        ensure_removable_source(target_id, NodeKind::MatchArm, "guard")?;
         return Ok(Some(ExtractedNode {
             node: PatchNode::Expr(
                 arm.guard
@@ -340,7 +341,7 @@ fn extract_from_match_arm(
         }
     }
     if expr_id(&arm.body).is_some_and(|id| id == target_id) {
-        return Err(required_source_error(target_id, "body"));
+        return removable_source_error(target_id, NodeKind::MatchArm, "body");
     }
     extract_from_expr(&mut arm.body, target_id)
 }
@@ -351,6 +352,8 @@ fn append_attachment_closure(
     target_id: &str,
     closure: AttachmentClosure,
 ) -> Result<(), PatchError> {
+    validate_attachment_destination(file, dest, &closure)?;
+
     match (dest, closure) {
         (PatchDest::Ranked(dest), AttachmentClosure::Items(items)) => {
             append_item_closure(file, dest, target_id, items)
@@ -359,9 +362,9 @@ fn append_attachment_closure(
             append_stmt_closure(file, dest, target_id, stmts)
         }
         (PatchDest::Slot(_), AttachmentClosure::Items(_))
-        | (PatchDest::Slot(_), AttachmentClosure::Stmts(_)) => Err(patch_error(
-            "cannot move a node with attached docs/comments into a single-child slot",
-        )),
+        | (PatchDest::Slot(_), AttachmentClosure::Stmts(_)) => {
+            Err(patch_error(single_slot_attachment_closure_message()))
+        }
     }
 }
 
@@ -371,12 +374,6 @@ fn append_item_closure(
     target_id: &str,
     mut closure: Vec<Item>,
 ) -> Result<(), PatchError> {
-    if dest.slot.slot != "items" {
-        return Err(patch_error(
-            "cannot move item attachments into a non-item ranked slot",
-        ));
-    }
-
     let internal_slot = match dest.slot.owner {
         SlotOwner::File => "file_items",
         SlotOwner::Node(_) => "items",
@@ -397,8 +394,9 @@ fn append_item_closure(
             if append_items_to_owner(&mut file.items, owner_id, &mut closure)? {
                 Ok(())
             } else {
-                Err(patch_error(&format!(
-                    "item attachment destination owner `@{owner_id}` was not found"
+                Err(patch_error(&attachment_owner_not_found_message(
+                    owner_id,
+                    AttachmentContainerKind::Items,
                 )))
             }
         }
@@ -419,11 +417,7 @@ fn append_items_to_owner(
                         .extend(closure.take().expect("item closure should only move once"));
                     return Ok(true);
                 }
-                _ => {
-                    return Err(patch_error(&format!(
-                        "owner `@{owner_id}` does not expose an item attachment container"
-                    )));
-                }
+                _ => unreachable!("validated item attachment owner must be a module"),
             }
         }
         if let Item::Mod(module) = item {
@@ -441,12 +435,6 @@ fn append_stmt_closure(
     target_id: &str,
     mut closure: Vec<Stmt>,
 ) -> Result<(), PatchError> {
-    if dest.slot.slot != "body" {
-        return Err(patch_error(
-            "cannot move statement attachments into a non-body ranked slot",
-        ));
-    }
-
     for stmt in &mut closure {
         assign_stmt_slot_and_rank(stmt, "body", None, true)?;
         match stmt {
@@ -457,16 +445,18 @@ fn append_stmt_closure(
     }
 
     match &dest.slot.owner {
-        SlotOwner::File => Err(patch_error(
-            "the file root does not expose a statement body slot",
-        )),
+        SlotOwner::File => Err(patch_error(&invalid_attachment_container_owner_message(
+            &slot_owner_label(&dest.slot.owner),
+            AttachmentContainerKind::Stmts,
+        ))),
         SlotOwner::Node(owner_id) => {
             let mut closure = Some(closure);
             if append_stmts_to_owner(&mut file.items, owner_id, &mut closure)? {
                 Ok(())
             } else {
-                Err(patch_error(&format!(
-                    "statement attachment destination owner `@{owner_id}` was not found"
+                Err(patch_error(&attachment_owner_not_found_message(
+                    owner_id,
+                    AttachmentContainerKind::Stmts,
                 )))
             }
         }
@@ -489,11 +479,7 @@ fn append_stmts_to_owner(
                     );
                     return Ok(true);
                 }
-                _ => {
-                    return Err(patch_error(&format!(
-                        "owner `@{owner_id}` does not expose a statement body slot"
-                    )));
-                }
+                _ => unreachable!("validated statement attachment owner must be a function"),
             }
         }
         match item {
@@ -564,11 +550,7 @@ fn append_stmts_to_expr(
                 );
                 return Ok(true);
             }
-            _ => {
-                return Err(patch_error(&format!(
-                    "owner `@{owner_id}` does not expose a statement body slot"
-                )));
-            }
+            _ => unreachable!("validated statement attachment owner must be a block"),
         }
     }
 
@@ -628,11 +610,7 @@ fn append_stmts_to_item(
                 );
                 return Ok(true);
             }
-            _ => {
-                return Err(patch_error(&format!(
-                    "owner `@{owner_id}` does not expose a statement body slot"
-                )));
-            }
+            _ => unreachable!("validated statement attachment owner must be a function"),
         }
     }
 
@@ -645,8 +623,87 @@ fn append_stmts_to_item(
     }
 }
 
-fn required_source_error(target_id: &str, slot: &str) -> PatchError {
-    patch_error(&format!(
-        "move target `{target_id}` cannot be removed from required slot `{slot}`"
-    ))
+fn validate_attachment_destination(
+    file: &File,
+    dest: &PatchDest,
+    closure: &AttachmentClosure,
+) -> Result<(), PatchError> {
+    let closure_kind = attachment_closure_kind(closure);
+
+    let PatchDest::Ranked(dest) = dest else {
+        return Err(patch_error(single_slot_attachment_closure_message()));
+    };
+
+    let (owner_kind, owner_label) = match &dest.slot.owner {
+        SlotOwner::File => (NodeKind::File, slot_owner_label(&dest.slot.owner)),
+        SlotOwner::Node(owner_id) => (
+            find_node_kind(file, owner_id).ok_or_else(|| {
+                patch_error(&attachment_owner_not_found_message(owner_id, closure_kind))
+            })?,
+            slot_owner_label(&dest.slot.owner),
+        ),
+    };
+
+    if attachment_container_kind_for_owner(owner_kind) != Some(closure_kind) {
+        return Err(patch_error(&invalid_attachment_container_owner_message(
+            &owner_label,
+            closure_kind,
+        )));
+    }
+
+    if !attachment_closure_allowed(owner_kind, &dest.slot.slot, closure_kind) {
+        return Err(patch_error(invalid_attachment_closure_destination_message(
+            closure_kind,
+        )));
+    }
+
+    Ok(())
+}
+
+fn attachment_closure_kind(closure: &AttachmentClosure) -> AttachmentContainerKind {
+    match closure {
+        AttachmentClosure::Items(_) => AttachmentContainerKind::Items,
+        AttachmentClosure::Stmts(_) => AttachmentContainerKind::Stmts,
+    }
+}
+
+fn attachment_owner_not_found_message(
+    owner_id: &str,
+    closure_kind: AttachmentContainerKind,
+) -> String {
+    match closure_kind {
+        AttachmentContainerKind::Items => {
+            format!("item attachment destination owner `@{owner_id}` was not found")
+        }
+        AttachmentContainerKind::Stmts => {
+            format!("statement attachment destination owner `@{owner_id}` was not found")
+        }
+    }
+}
+
+fn removable_source_error(
+    target_id: &str,
+    owner_kind: NodeKind,
+    slot: &str,
+) -> Result<Option<ExtractedNode>, PatchError> {
+    ensure_removable_source(target_id, owner_kind, slot)?;
+    Ok(None)
+}
+
+fn ensure_removable_source(
+    target_id: &str,
+    owner_kind: NodeKind,
+    slot: &str,
+) -> Result<(), PatchError> {
+    match removable_slot_spec(owner_kind, slot) {
+        Some(_) => Ok(()),
+        None => {
+            let message = if slot_spec(owner_kind, slot).is_some() {
+                required_slot_error_message("move", target_id, slot)
+            } else {
+                unsupported_slot_error_message("move", target_id, slot)
+            };
+            Err(patch_error(&message))
+        }
+    }
 }

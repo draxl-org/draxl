@@ -2,6 +2,10 @@ use super::support::{
     is_item_trivia, is_stmt_trivia, semantic_item_target_ids, semantic_stmt_target_ids,
 };
 use crate::error::{patch_error, PatchError};
+use crate::schema::{
+    attach_target_not_sibling_message, detach_requires_following_sibling_message, find_node_kind,
+    is_attachable_kind,
+};
 use draxl_ast::{Block, Expr, File, Item, Stmt};
 
 pub(super) fn apply_attach(
@@ -9,6 +13,12 @@ pub(super) fn apply_attach(
     node_id: &str,
     target_id: &str,
 ) -> Result<(), PatchError> {
+    if !find_node_kind(file, node_id).is_some_and(is_attachable_kind) {
+        return Err(patch_error(&format!(
+            "attach source `{node_id}` was not found or is not attachable"
+        )));
+    }
+
     if attach_in_items(&mut file.items, node_id, target_id)? {
         Ok(())
     } else {
@@ -19,6 +29,12 @@ pub(super) fn apply_attach(
 }
 
 pub(super) fn apply_detach(file: &mut File, node_id: &str) -> Result<(), PatchError> {
+    if !find_node_kind(file, node_id).is_some_and(is_attachable_kind) {
+        return Err(patch_error(&format!(
+            "detach source `{node_id}` was not found or is not attachable"
+        )));
+    }
+
     if detach_in_items(&mut file.items, node_id)? {
         Ok(())
     } else {
@@ -41,8 +57,8 @@ fn attach_in_items(
         match item {
             Item::Doc(node) if node.meta.id == node_id => {
                 if !local_targets.iter().any(|candidate| candidate == target_id) {
-                    return Err(patch_error(&format!(
-                        "attach target `{target_id}` is not a sibling semantic node for `{node_id}`"
+                    return Err(patch_error(&attach_target_not_sibling_message(
+                        target_id, node_id,
                     )));
                 }
                 node.meta.anchor = Some(target_id.to_owned());
@@ -50,8 +66,8 @@ fn attach_in_items(
             }
             Item::Comment(node) if node.meta.id == node_id => {
                 if !local_targets.iter().any(|candidate| candidate == target_id) {
-                    return Err(patch_error(&format!(
-                        "attach target `{target_id}` is not a sibling semantic node for `{node_id}`"
+                    return Err(patch_error(&attach_target_not_sibling_message(
+                        target_id, node_id,
                     )));
                 }
                 node.meta.anchor = Some(target_id.to_owned());
@@ -99,8 +115,8 @@ fn attach_in_stmts(
         match stmt {
             Stmt::Doc(node) if node.meta.id == node_id => {
                 if !local_targets.iter().any(|candidate| candidate == target_id) {
-                    return Err(patch_error(&format!(
-                        "attach target `{target_id}` is not a sibling semantic node for `{node_id}`"
+                    return Err(patch_error(&attach_target_not_sibling_message(
+                        target_id, node_id,
                     )));
                 }
                 node.meta.anchor = Some(target_id.to_owned());
@@ -108,8 +124,8 @@ fn attach_in_stmts(
             }
             Stmt::Comment(node) if node.meta.id == node_id => {
                 if !local_targets.iter().any(|candidate| candidate == target_id) {
-                    return Err(patch_error(&format!(
-                        "attach target `{target_id}` is not a sibling semantic node for `{node_id}`"
+                    return Err(patch_error(&attach_target_not_sibling_message(
+                        target_id, node_id,
                     )));
                 }
                 node.meta.anchor = Some(target_id.to_owned());
@@ -189,8 +205,8 @@ fn detach_in_items(items: &mut Vec<Item>, node_id: &str) -> Result<bool, PatchEr
         match &mut items[index] {
             Item::Doc(node) if node.meta.id == node_id => {
                 if !has_following {
-                    return Err(patch_error(&format!(
-                        "detach source `{node_id}` needs a following sibling semantic node"
+                    return Err(patch_error(&detach_requires_following_sibling_message(
+                        node_id,
                     )));
                 }
                 node.meta.anchor = None;
@@ -198,8 +214,8 @@ fn detach_in_items(items: &mut Vec<Item>, node_id: &str) -> Result<bool, PatchEr
             }
             Item::Comment(node) if node.meta.id == node_id => {
                 if !has_following {
-                    return Err(patch_error(&format!(
-                        "detach source `{node_id}` needs a following sibling semantic node"
+                    return Err(patch_error(&detach_requires_following_sibling_message(
+                        node_id,
                     )));
                 }
                 node.meta.anchor = None;
@@ -234,8 +250,8 @@ fn detach_in_stmts(stmts: &mut Vec<Stmt>, node_id: &str) -> Result<bool, PatchEr
         match &mut stmts[index] {
             Stmt::Doc(node) if node.meta.id == node_id => {
                 if !has_following {
-                    return Err(patch_error(&format!(
-                        "detach source `{node_id}` needs a following sibling semantic node"
+                    return Err(patch_error(&detach_requires_following_sibling_message(
+                        node_id,
                     )));
                 }
                 node.meta.anchor = None;
@@ -243,8 +259,8 @@ fn detach_in_stmts(stmts: &mut Vec<Stmt>, node_id: &str) -> Result<bool, PatchEr
             }
             Stmt::Comment(node) if node.meta.id == node_id => {
                 if !has_following {
-                    return Err(patch_error(&format!(
-                        "detach source `{node_id}` needs a following sibling semantic node"
+                    return Err(patch_error(&detach_requires_following_sibling_message(
+                        node_id,
                     )));
                 }
                 node.meta.anchor = None;

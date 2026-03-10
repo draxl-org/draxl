@@ -2,7 +2,7 @@ mod support;
 
 use draxl::{
     self,
-    patch::{PatchNode, PatchOp, PatchPath, PatchValue, SlotOwner, SlotRef},
+    patch::{PatchDest, PatchNode, PatchOp, PatchPath, PatchValue, RankedDest, SlotOwner, SlotRef},
 };
 use draxl_printer::print_file;
 use draxl_validate::validate_file;
@@ -128,6 +128,80 @@ fn structured_and_textual_set_share_the_same_path_validation_message() {
 
     let textual_error = draxl::apply_patch_text(&mut textual_file, "set @f1.text = \"nope\"\n")
         .expect_err("path should be rejected")
+        .to_string();
+
+    assert_eq!(structured_error, strip_location(&textual_error));
+}
+
+#[test]
+fn structured_and_textual_delete_share_the_same_slot_validation_message() {
+    let source = read("examples/01_add.rs.dx");
+    let mut structured_file = draxl::parse_and_validate(&source).expect("example should parse");
+    let mut textual_file = draxl::parse_and_validate(&source).expect("example should parse");
+
+    let structured_error = draxl::apply_patch(
+        &mut structured_file,
+        PatchOp::Delete {
+            target_id: "e3".to_owned(),
+        },
+    )
+    .expect_err("delete should be rejected")
+    .to_string();
+
+    let textual_error = draxl::apply_patch_text(&mut textual_file, "delete @e3\n")
+        .expect_err("delete should be rejected")
+        .to_string();
+
+    assert_eq!(structured_error, strip_location(&textual_error));
+}
+
+#[test]
+fn structured_and_textual_move_share_the_same_slot_validation_message() {
+    let source = read("examples/01_add.rs.dx");
+    let mut structured_file = draxl::parse_and_validate(&source).expect("example should parse");
+    let mut textual_file = draxl::parse_and_validate(&source).expect("example should parse");
+
+    let structured_error = draxl::apply_patch(
+        &mut structured_file,
+        PatchOp::Move {
+            target_id: "e3".to_owned(),
+            dest: PatchDest::Ranked(RankedDest {
+                slot: SlotRef {
+                    owner: SlotOwner::Node("f1".to_owned()),
+                    slot: "body".to_owned(),
+                },
+                rank: "az".to_owned(),
+            }),
+        },
+    )
+    .expect_err("move should be rejected")
+    .to_string();
+
+    let textual_error = draxl::apply_patch_text(&mut textual_file, "move @e3 -> @f1.body[az]\n")
+        .expect_err("move should be rejected")
+        .to_string();
+
+    assert_eq!(structured_error, strip_location(&textual_error));
+}
+
+#[test]
+fn structured_and_textual_attach_share_the_same_sibling_validation_message() {
+    let source = read("examples/01_add.rs.dx");
+    let mut structured_file = draxl::parse_and_validate(&source).expect("example should parse");
+    let mut textual_file = draxl::parse_and_validate(&source).expect("example should parse");
+
+    let structured_error = draxl::apply_patch(
+        &mut structured_file,
+        PatchOp::Attach {
+            node_id: "d1".to_owned(),
+            target_id: "s1".to_owned(),
+        },
+    )
+    .expect_err("attach should be rejected")
+    .to_string();
+
+    let textual_error = draxl::apply_patch_text(&mut textual_file, "attach @d1 -> @s1\n")
+        .expect_err("attach should be rejected")
         .to_string();
 
     assert_eq!(structured_error, strip_location(&textual_error));
