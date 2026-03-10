@@ -15,7 +15,19 @@ identity, and attachment data that replay, merge, audit, and lowering
 workflows need.
 
 ```text
-agent edits -> semantic ops over stable ids -> validated Draxl -> canonical .rs.dx -> Rust
+agent edits
+  |
+  v
+semantic ops over stable ids
+  |
+  v
+validated Draxl
+  |
+  v
+canonical .rs.dx
+  |
+  v
+Rust
 ```
 
 The `.rs.dx` extension is intentional. `.dx` names the Draxl layer and `.rs`
