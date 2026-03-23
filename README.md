@@ -137,8 +137,8 @@ ranked slots instead of guessing intent from lines and spans.
 
 Draxl distinguishes between hard conflicts, validation/build failures, and
 semantic conflicts. For the layering model and current terminology, see
-[docs/conflicts.md](docs/conflicts.md) and
-[docs/semantic-conflicts.md](docs/semantic-conflicts.md).
+[docs/merge/conflicts.md](docs/merge/conflicts.md) and
+[docs/merge/semantic-conflicts.md](docs/merge/semantic-conflicts.md).
 
 ## Semantic patching
 
@@ -196,6 +196,8 @@ formatting, nearby inserts, and many refactors.
 
 The structured Rust API and `draxl patch` both execute this textual patch
 surface directly.
+
+Patch docs now live under [docs/patching/README.md](docs/patching/README.md).
 
 The same model can also express edits that are awkward in unified diffs, such
 as `attach @d2 -> @f1`, `move @s2 -> @f1.body[ah]`, or `set @f1.name = run`.
@@ -269,7 +271,7 @@ addresses the ranked body slot and the other replaces node `@e2`.
 Not every merge-relevant overlap is a hard conflict. Draxl also tracks semantic
 conflicts: cases where the patch streams remain structurally mergeable but the
 combined result should still be reviewed. See
-[docs/semantic-conflicts.md](docs/semantic-conflicts.md).
+[docs/merge/semantic-conflicts.md](docs/merge/semantic-conflicts.md).
 
 ## What works today
 
@@ -323,9 +325,8 @@ More detail:
 
 - [docs/architecture.md](docs/architecture.md)
 - [docs/syntax.md](docs/syntax.md)
-- [docs/patching.md](docs/patching.md)
-- [docs/patch-op-syntax.md](docs/patch-op-syntax.md)
-- [docs/semantic-conflicts.md](docs/semantic-conflicts.md)
+- [docs/patching/README.md](docs/patching/README.md)
+- [docs/merge/README.md](docs/merge/README.md)
 
 ## Library crate
 
