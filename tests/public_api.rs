@@ -1,6 +1,8 @@
 mod support;
 
 use draxl::{self, Error};
+use draxl_parser::parse_expr_fragment;
+use draxl_patch::{PatchNode, PatchOp, PatchPath, PatchValue};
 use support::read;
 
 #[test]
@@ -52,4 +54,80 @@ fn facade_surfaces_validation_errors() {
         ),
         Error::Parse(error) => panic!("expected validation error, got parse error: {error}"),
     }
+}
+
+#[test]
+fn facade_check_conflicts_json_matches_the_agent_shape() {
+    let source = r#"
+@m1 mod demo {
+  @f1[a] fn price(@p1[a] amount: @t1 Cents) -> @t2 Cents {
+    @s1[a] let @p2 subtotal = @e1 amount;
+    @s2[b] @e2 subtotal
+  }
+}
+"#;
+    let file = draxl::parse_and_validate(source).expect("source should parse and validate");
+    let left = vec![
+        PatchOp::Set {
+            path: PatchPath {
+                node_id: "p2".to_owned(),
+                segments: vec!["name".to_owned()],
+            },
+            value: PatchValue::Ident("subtotal_cents".to_owned()),
+        },
+        PatchOp::Replace {
+            target_id: "e2".to_owned(),
+            replacement: PatchNode::Expr(
+                parse_expr_fragment("@e2 subtotal_cents")
+                    .expect("reference rename fragment should parse"),
+            ),
+        },
+    ];
+    let right = vec![PatchOp::Replace {
+        target_id: "e1".to_owned(),
+        replacement: PatchNode::Expr(
+            parse_expr_fragment("@e1 to_dollars(@e3 amount)")
+                .expect("initializer replacement should parse"),
+        ),
+    }];
+
+    let json = draxl::check_conflicts_json(&file, &left, &right);
+
+    assert_eq!(
+        json,
+        r#"{
+  "conflicts": [
+    {
+      "class": "semantic",
+      "code": "binding_rename_vs_initializer_change",
+      "owner": {
+        "kind": "binding",
+        "let_id": "s1",
+        "binding_id": "p2"
+      },
+      "left_regions": [
+        "binding_name"
+      ],
+      "right_regions": [
+        "binding_initializer"
+      ],
+      "left": [
+        {
+          "op_index": 0,
+          "op_kind": "set",
+          "target": "@p2.name"
+        }
+      ],
+      "right": [
+        {
+          "op_index": 0,
+          "op_kind": "replace",
+          "target": "@e1"
+        }
+      ]
+    }
+  ]
+}
+"#
+    );
 }

@@ -67,6 +67,35 @@ fn reports_duplicate_rank_inserts_as_hard_conflicts() {
     assert!(report.conflicts[0].summary.contains("@f4.body[ah]"));
     assert_eq!(report.conflicts[0].left.len(), 1);
     assert_eq!(report.conflicts[0].right.len(), 1);
+    assert_eq!(
+        report.to_json_pretty(),
+        r#"{
+  "conflicts": [
+    {
+      "class": "hard",
+      "code": "same_ranked_position",
+      "owner": null,
+      "left_regions": [],
+      "right_regions": [],
+      "left": [
+        {
+          "op_index": 0,
+          "op_kind": "insert",
+          "target": "@f4.body[ah]"
+        }
+      ],
+      "right": [
+        {
+          "op_index": 0,
+          "op_kind": "insert",
+          "target": "@f4.body[ah]"
+        }
+      ]
+    }
+  ]
+}
+"#
+    );
 }
 
 #[test]

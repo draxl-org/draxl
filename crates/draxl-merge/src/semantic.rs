@@ -1,4 +1,5 @@
 use crate::context::{LetRegion, TreeContext};
+use crate::model::{ConflictOwner, ConflictRegion};
 use draxl_ast::{Expr, Stmt};
 use draxl_patch::{PatchDest, PatchNode, PatchOp, PatchValue, SlotOwner, SlotRef};
 
@@ -28,6 +29,37 @@ pub(crate) struct SemanticChange {
     pub owner: SemanticOwner,
     pub region: SemanticRegion,
     pub op_index: usize,
+}
+
+impl From<&SemanticOwner> for ConflictOwner {
+    fn from(owner: &SemanticOwner) -> Self {
+        match owner {
+            SemanticOwner::Binding { let_id, binding_id } => Self::Binding {
+                let_id: let_id.clone(),
+                binding_id: binding_id.clone(),
+            },
+            SemanticOwner::Parameter {
+                fn_id,
+                param_id,
+                param_name,
+            } => Self::Parameter {
+                fn_id: fn_id.clone(),
+                param_id: param_id.clone(),
+                param_name: param_name.clone(),
+            },
+        }
+    }
+}
+
+impl From<SemanticRegion> for ConflictRegion {
+    fn from(region: SemanticRegion) -> Self {
+        match region {
+            SemanticRegion::BindingName => Self::BindingName,
+            SemanticRegion::BindingInitializer => Self::BindingInitializer,
+            SemanticRegion::ParameterTypeContract => Self::ParameterTypeContract,
+            SemanticRegion::ParameterBodyInterpretation => Self::ParameterBodyInterpretation,
+        }
+    }
 }
 
 pub(crate) fn extract_semantic_changes(

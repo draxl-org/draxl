@@ -13,6 +13,6 @@ mod semantic;
 
 pub use detect::{check_conflicts, check_hard_conflicts};
 pub use model::{
-    Conflict, ConflictClass, ConflictCode, ConflictReport, ConflictSide, HardConflictReport,
-    ReplayOrder, ReplayStage,
+    Conflict, ConflictClass, ConflictCode, ConflictOwner, ConflictRegion, ConflictReport,
+    ConflictSide, HardConflictReport, ReplayOrder, ReplayStage,
 };

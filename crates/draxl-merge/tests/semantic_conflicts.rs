@@ -1,4 +1,7 @@
-use draxl_merge::{check_conflicts, check_hard_conflicts, ConflictClass, ConflictCode};
+use draxl_merge::{
+    check_conflicts, check_hard_conflicts, ConflictClass, ConflictCode, ConflictOwner,
+    ConflictRegion,
+};
 use draxl_parser::{parse_expr_fragment, parse_type_fragment};
 use draxl_patch::{PatchNode, PatchOp, PatchPath, PatchValue, SlotOwner, SlotRef};
 use draxl_validate::validate_file;
@@ -52,13 +55,60 @@ fn reports_binding_rename_vs_initializer_change_as_semantic_conflict() {
         report.conflicts[0].code,
         ConflictCode::BindingRenameVsInitializerChange
     );
-    assert!(report.conflicts[0].summary.contains("@p2"));
-    assert!(report.conflicts[0].summary.contains("@s1"));
-    assert!(report.conflicts[0]
-        .detail
-        .contains("structurally mergeable"));
+    assert_eq!(
+        report.conflicts[0].owner,
+        Some(ConflictOwner::Binding {
+            let_id: "s1".to_owned(),
+            binding_id: "p2".to_owned(),
+        })
+    );
+    assert_eq!(
+        report.conflicts[0].left_regions,
+        vec![ConflictRegion::BindingName]
+    );
+    assert_eq!(
+        report.conflicts[0].right_regions,
+        vec![ConflictRegion::BindingInitializer]
+    );
     assert_eq!(report.conflicts[0].left.len(), 1);
     assert_eq!(report.conflicts[0].right.len(), 1);
+    assert_eq!(
+        report.to_json_pretty(),
+        r#"{
+  "conflicts": [
+    {
+      "class": "semantic",
+      "code": "binding_rename_vs_initializer_change",
+      "owner": {
+        "kind": "binding",
+        "let_id": "s1",
+        "binding_id": "p2"
+      },
+      "left_regions": [
+        "binding_name"
+      ],
+      "right_regions": [
+        "binding_initializer"
+      ],
+      "left": [
+        {
+          "op_index": 0,
+          "op_kind": "set",
+          "target": "@p2.name"
+        }
+      ],
+      "right": [
+        {
+          "op_index": 0,
+          "op_kind": "replace",
+          "target": "@e1"
+        }
+      ]
+    }
+  ]
+}
+"#
+    );
 }
 
 #[test]
@@ -135,9 +185,22 @@ fn reports_parameter_type_vs_body_interpretation_change_as_semantic_conflict() {
         report.conflicts[0].code,
         ConflictCode::ParameterTypeVsBodyInterpretationChange
     );
-    assert!(report.conflicts[0].summary.contains("@p1"));
-    assert!(report.conflicts[0].summary.contains("@f1"));
-    assert!(report.conflicts[0].detail.contains("parameter contract"));
+    assert_eq!(
+        report.conflicts[0].owner,
+        Some(ConflictOwner::Parameter {
+            fn_id: "f1".to_owned(),
+            param_id: "p1".to_owned(),
+            param_name: "rate".to_owned(),
+        })
+    );
+    assert_eq!(
+        report.conflicts[0].left_regions,
+        vec![ConflictRegion::ParameterTypeContract]
+    );
+    assert_eq!(
+        report.conflicts[0].right_regions,
+        vec![ConflictRegion::ParameterBodyInterpretation]
+    );
     assert_eq!(report.conflicts[0].left.len(), 1);
     assert_eq!(report.conflicts[0].right.len(), 1);
 }

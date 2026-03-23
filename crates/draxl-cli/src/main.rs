@@ -5,8 +5,8 @@
 //! parser, validator, printer, and lowering behavior itself.
 
 use draxl::{
-    apply_patch_text, dump_json_source, format_file, format_source, lower_rust_source,
-    parse_and_validate, parse_file, validate_file,
+    apply_patch_text, check_conflicts_json, dump_json_source, format_file, format_source,
+    lower_rust_source, parse_and_validate, parse_file, resolve_patch_ops, validate_file,
 };
 use std::env;
 use std::fs;
@@ -106,6 +106,20 @@ fn run() -> Result<(), String> {
             }
             Ok(())
         }
+        "conflicts" => {
+            let path = parse_path_arg(args.next(), "conflicts")?;
+            let left_patch_path = parse_path_arg(args.next(), "conflicts")?;
+            let right_patch_path = parse_path_arg(args.next(), "conflicts")?;
+            let source = read_source(&path)?;
+            let file = parse_and_validate(&source).map_err(|err| err.to_string())?;
+            let left_patch = read_source(&left_patch_path)?;
+            let right_patch = read_source(&right_patch_path)?;
+            let left_ops = resolve_patch_ops(&file, &left_patch).map_err(|err| err.to_string())?;
+            let right_ops =
+                resolve_patch_ops(&file, &right_patch).map_err(|err| err.to_string())?;
+            print!("{}", check_conflicts_json(&file, &left_ops, &right_ops));
+            Ok(())
+        }
         _ => Err(usage()),
     }
 }
@@ -136,6 +150,7 @@ fn usage() -> String {
   draxl dump-json <file>
   draxl validate <file>
   draxl lower-rust <file>
-  draxl patch [--in-place] <file> <patch-file>"
+  draxl patch [--in-place] <file> <patch-file>
+  draxl conflicts <file> <left-patch-file> <right-patch-file>"
         .to_owned()
 }

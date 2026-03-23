@@ -78,6 +78,37 @@ Good candidates include:
 The current detailed semantic-conflict examples are documented in
 [semantic-conflicts.md](semantic-conflicts.md).
 
+## Agent JSON Surface
+
+`draxl-merge` and the root `draxl` facade now expose merge conflict reports as
+machine-oriented JSON.
+
+The top-level shape is:
+
+- `conflicts`
+
+Each conflict includes:
+
+- `class`
+- `code`
+- `owner`
+- `left_regions`
+- `right_regions`
+- `left`
+- `right`
+
+For semantic conflicts:
+
+- `owner` identifies the semantic object being reviewed
+- `left_regions` and `right_regions` identify the meaning-bearing regions each
+  patch stream touched
+
+For hard conflicts in the current profile:
+
+- `owner` is `null`
+- `left_regions` and `right_regions` are empty arrays
+- agents should route on `code` plus the left/right operation evidence
+
 ## Why The Layering Matters
 
 This order sharpens what semantic conflicts should cover.

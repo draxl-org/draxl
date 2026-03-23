@@ -141,6 +141,79 @@ set @f1.name = renamed_first
     assert!(rewritten.contains("fn renamed_first()"));
 }
 
+#[test]
+fn conflicts_command_emits_agent_json() {
+    let source_path = write_temp_file(
+        "conflicts_source.rs.dx",
+        r#"
+@m1 mod demo {
+  @f1[a] fn price(@p1[a] amount: @t1 Cents) -> @t2 Cents {
+    @s1[a] let @p2 subtotal = @e1 amount;
+    @s2[b] @e2 subtotal
+  }
+}
+"#,
+    );
+    let left_patch_path = write_temp_file(
+        "conflicts_left.dxpatch",
+        r#"
+set @p2.name = subtotal_cents
+replace @e2: @e2 subtotal_cents
+"#,
+    );
+    let right_patch_path = write_temp_file(
+        "conflicts_right.dxpatch",
+        r#"
+replace @e1: @e1 to_dollars(@e3 amount)
+"#,
+    );
+
+    let output = run_ok(&[
+        "conflicts",
+        source_path.to_str().unwrap(),
+        left_patch_path.to_str().unwrap(),
+        right_patch_path.to_str().unwrap(),
+    ]);
+
+    assert_eq!(
+        output,
+        r#"{
+  "conflicts": [
+    {
+      "class": "semantic",
+      "code": "binding_rename_vs_initializer_change",
+      "owner": {
+        "kind": "binding",
+        "let_id": "s1",
+        "binding_id": "p2"
+      },
+      "left_regions": [
+        "binding_name"
+      ],
+      "right_regions": [
+        "binding_initializer"
+      ],
+      "left": [
+        {
+          "op_index": 0,
+          "op_kind": "set",
+          "target": "@p2.name"
+        }
+      ],
+      "right": [
+        {
+          "op_index": 0,
+          "op_kind": "replace",
+          "target": "@e1"
+        }
+      ]
+    }
+  ]
+}
+"#
+    );
+}
+
 fn run_ok(args: &[&str]) -> String {
     let output = Command::new(binary_path())
         .args(args)

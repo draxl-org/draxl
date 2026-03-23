@@ -1,5 +1,6 @@
 use crate::model::{
-    Conflict, ConflictClass, ConflictCode, ConflictSide, ReplayFailure, ReplayOrder, ReplayStage,
+    Conflict, ConflictClass, ConflictCode, ConflictOwner, ConflictRegion, ConflictSide,
+    ReplayFailure, ReplayOrder, ReplayStage,
 };
 use crate::render::{node_label, path_label, ranked_dest_label, summarize_side};
 use draxl_patch::{PatchOp, RankedDest, SlotRef};
@@ -14,6 +15,9 @@ pub(crate) fn same_node_write_conflict(
     Conflict {
         class: ConflictClass::Hard,
         code: ConflictCode::SameNodeWrite,
+        owner: None,
+        left_regions: Vec::new(),
+        right_regions: Vec::new(),
         summary: format!("both patch streams write the same node target `@{node_id}`"),
         detail: format!(
             "The left and right patch streams both modify the same node shell `@{node_id}`. \
@@ -39,6 +43,9 @@ pub(crate) fn same_scalar_path_write_conflict(
     Conflict {
         class: ConflictClass::Hard,
         code: ConflictCode::SameScalarPathWrite,
+        owner: None,
+        left_regions: Vec::new(),
+        right_regions: Vec::new(),
         summary: format!("both patch streams write the same scalar path `{path}`"),
         detail: format!(
             "The left and right patch streams both write `{path}`. \
@@ -61,6 +68,9 @@ pub(crate) fn same_single_slot_write_conflict(
     Conflict {
         class: ConflictClass::Hard,
         code: ConflictCode::SameSingleSlotWrite,
+        owner: None,
+        left_regions: Vec::new(),
+        right_regions: Vec::new(),
         summary: format!("both patch streams write the same single-child slot `{target}`"),
         detail: format!(
             "The left and right patch streams both assign the single-child slot `{target}`. \
@@ -83,6 +93,9 @@ pub(crate) fn same_ranked_position_conflict(
     Conflict {
         class: ConflictClass::Hard,
         code: ConflictCode::SameRankedPosition,
+        owner: None,
+        left_regions: Vec::new(),
+        right_regions: Vec::new(),
         summary: format!("both patch streams target the same ranked position `{target}`"),
         detail: format!(
             "The left and right patch streams both write `{target}`. \
@@ -103,6 +116,9 @@ pub(crate) fn replay_failure_conflict(
     Conflict {
         class: ConflictClass::Hard,
         code: ConflictCode::ReplayFailure,
+        owner: None,
+        left_regions: Vec::new(),
+        right_regions: Vec::new(),
         summary,
         detail,
         left: replay_relevant_sides(failure, left, true),
@@ -129,6 +145,9 @@ pub(crate) fn non_convergent_replay_conflict(left: &[PatchOp], right: &[PatchOp]
     Conflict {
         class: ConflictClass::Hard,
         code: ConflictCode::NonConvergentReplay,
+        owner: None,
+        left_regions: Vec::new(),
+        right_regions: Vec::new(),
         summary: "the two replay orders produce different final ASTs".to_owned(),
         detail: format!(
             "Both replay orders succeeded, but they did not converge to the same canonical AST. \
@@ -148,14 +167,22 @@ pub(crate) fn non_convergent_replay_conflict(left: &[PatchOp], right: &[PatchOp]
 pub(crate) fn binding_rename_vs_initializer_change_conflict(
     left_index: usize,
     left_op: &PatchOp,
+    left_region: ConflictRegion,
     right_index: usize,
     right_op: &PatchOp,
+    right_region: ConflictRegion,
     let_id: &str,
     binding_id: &str,
 ) -> Conflict {
     Conflict {
         class: ConflictClass::Semantic,
         code: ConflictCode::BindingRenameVsInitializerChange,
+        owner: Some(ConflictOwner::Binding {
+            let_id: let_id.to_owned(),
+            binding_id: binding_id.to_owned(),
+        }),
+        left_regions: vec![left_region],
+        right_regions: vec![right_region],
         summary: format!(
             "one side renames binding `{}` while the other changes initializer meaning in `{}`",
             node_label(binding_id),
@@ -180,14 +207,24 @@ pub(crate) fn binding_rename_vs_initializer_change_conflict(
 pub(crate) fn parameter_type_vs_body_interpretation_change_conflict(
     left_index: usize,
     left_op: &PatchOp,
+    left_region: ConflictRegion,
     right_index: usize,
     right_op: &PatchOp,
+    right_region: ConflictRegion,
     fn_id: &str,
     param_id: &str,
+    param_name: &str,
 ) -> Conflict {
     Conflict {
         class: ConflictClass::Semantic,
         code: ConflictCode::ParameterTypeVsBodyInterpretationChange,
+        owner: Some(ConflictOwner::Parameter {
+            fn_id: fn_id.to_owned(),
+            param_id: param_id.to_owned(),
+            param_name: param_name.to_owned(),
+        }),
+        left_regions: vec![left_region],
+        right_regions: vec![right_region],
         summary: format!(
             "one side changes parameter contract `{}` while the other changes body interpretation in `{}`",
             node_label(param_id),

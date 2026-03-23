@@ -367,6 +367,7 @@ cargo run -p draxl-cli -- fmt examples/01_add.rs.dx
 cargo run -p draxl-cli -- dump-json examples/01_add.rs.dx
 cargo run -p draxl-cli -- validate examples/01_add.rs.dx
 cargo run -p draxl-cli -- lower-rust examples/01_add.rs.dx
+cargo run -p draxl-cli -- conflicts <file> <left-patch-file> <right-patch-file>
 ```
 
 ## License

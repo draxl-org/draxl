@@ -82,6 +82,22 @@ Owner and regions in this example:
 - owner: the binding introduced by `@p2` in `@s1`
 - regions: binding name and binding initializer
 
+Agent JSON for this conflict uses the same structure directly:
+
+```json
+{
+  "class": "semantic",
+  "code": "binding_rename_vs_initializer_change",
+  "owner": {
+    "kind": "binding",
+    "let_id": "s1",
+    "binding_id": "p2"
+  },
+  "left_regions": ["binding_name"],
+  "right_regions": ["binding_initializer"]
+}
+```
+
 Starting Draxl source:
 
 ```text

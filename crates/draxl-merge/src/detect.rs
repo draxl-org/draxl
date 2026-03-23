@@ -156,31 +156,40 @@ fn semantic_conflict_for_pair(
         ) => Some(binding_rename_vs_initializer_change_conflict(
             left_change.op_index,
             left_op,
+            left_change.region.into(),
             right_change.op_index,
             right_op,
+            right_change.region.into(),
             let_id,
             binding_id,
         )),
         (
             SemanticOwner::Parameter {
-                fn_id, param_id, ..
+                fn_id,
+                param_id,
+                param_name,
             },
             SemanticRegion::ParameterTypeContract,
             SemanticRegion::ParameterBodyInterpretation,
         )
         | (
             SemanticOwner::Parameter {
-                fn_id, param_id, ..
+                fn_id,
+                param_id,
+                param_name,
             },
             SemanticRegion::ParameterBodyInterpretation,
             SemanticRegion::ParameterTypeContract,
         ) => Some(parameter_type_vs_body_interpretation_change_conflict(
             left_change.op_index,
             left_op,
+            left_change.region.into(),
             right_change.op_index,
             right_op,
+            right_change.region.into(),
             fn_id,
             param_id,
+            param_name,
         )),
         _ => None,
     }

@@ -1,7 +1,8 @@
+use serde::Serialize;
 use std::fmt;
 
 /// Outcome of checking two patch streams for merge conflicts.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
 pub struct ConflictReport {
     /// Conflicts found while comparing the two patch streams.
     pub conflicts: Vec<Conflict>,
@@ -17,40 +18,47 @@ impl ConflictReport {
     pub fn has_conflicts(&self) -> bool {
         !self.is_clean()
     }
+
+    /// Emits deterministic JSON for the conflict report.
+    pub fn to_json_pretty(&self) -> String {
+        let mut out =
+            serde_json::to_string_pretty(self).expect("conflict report JSON serialization");
+        out.push('\n');
+        out
+    }
 }
 
 impl fmt::Display for ConflictReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.conflicts.is_empty() {
-            return f.write_str("no conflicts");
-        }
-
-        for (index, conflict) in self.conflicts.iter().enumerate() {
-            if index > 0 {
-                f.write_str("\n\n")?;
-            }
-            conflict.fmt(f)?;
-        }
-        Ok(())
+        f.write_str(&self.to_json_pretty())
     }
 }
 
 /// Structured conflict explanation suitable for humans and agents.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Conflict {
     /// Broad conflict class.
     pub class: ConflictClass,
     /// Stable conflict code.
     pub code: ConflictCode,
+    /// Semantic owner when the conflict is tied to one.
+    pub owner: Option<ConflictOwner>,
+    /// Meaning-bearing regions touched by the left-side operations.
+    pub left_regions: Vec<ConflictRegion>,
+    /// Meaning-bearing regions touched by the right-side operations.
+    pub right_regions: Vec<ConflictRegion>,
     /// Short one-line summary.
+    #[serde(skip_serializing)]
     pub summary: String,
     /// Richer explanation of why the conflict exists.
+    #[serde(skip_serializing)]
     pub detail: String,
     /// Relevant left-side operations.
     pub left: Vec<ConflictSide>,
     /// Relevant right-side operations.
     pub right: Vec<ConflictSide>,
     /// Suggested next step.
+    #[serde(skip_serializing)]
     pub remediation: Option<String>,
 }
 
@@ -81,8 +89,18 @@ impl fmt::Display for Conflict {
     }
 }
 
+impl Conflict {
+    /// Emits deterministic JSON for one conflict.
+    pub fn to_json_pretty(&self) -> String {
+        let mut out = serde_json::to_string_pretty(self).expect("conflict JSON serialization");
+        out.push('\n');
+        out
+    }
+}
+
 /// Broad conflict class.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ConflictClass {
     /// Hard conflicts stop deterministic auto-merge.
     Hard,
@@ -91,7 +109,8 @@ pub enum ConflictClass {
 }
 
 /// Stable conflict code for reporting and downstream handling.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ConflictCode {
     /// Both sides wrote the same node shell in incompatible ways.
     SameNodeWrite,
@@ -111,8 +130,33 @@ pub enum ConflictCode {
     ParameterTypeVsBodyInterpretationChange,
 }
 
+/// Semantic owner for machine-oriented conflict reports.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ConflictOwner {
+    Binding {
+        let_id: String,
+        binding_id: String,
+    },
+    Parameter {
+        fn_id: String,
+        param_id: String,
+        param_name: String,
+    },
+}
+
+/// Semantic region for machine-oriented conflict reports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConflictRegion {
+    BindingName,
+    BindingInitializer,
+    ParameterTypeContract,
+    ParameterBodyInterpretation,
+}
+
 /// Relevant operation from one side of the conflict.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ConflictSide {
     /// Index inside the original patch stream.
     pub op_index: usize,
@@ -121,6 +165,7 @@ pub struct ConflictSide {
     /// Compact target label such as `@e2` or `@f1.body[ah]`.
     pub target: String,
     /// Richer description of the operation.
+    #[serde(skip_serializing)]
     pub description: String,
 }
 

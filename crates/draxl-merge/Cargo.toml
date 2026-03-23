@@ -13,6 +13,8 @@ draxl-ast.workspace = true
 draxl-patch.workspace = true
 draxl-printer.workspace = true
 draxl-validate.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 draxl-parser.workspace = true

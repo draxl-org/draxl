@@ -183,6 +183,15 @@ pub fn check_hard_conflicts(
     merge::check_hard_conflicts(base, left, right)
 }
 
+/// Checks whether two patch streams have hard conflicts and emits JSON.
+pub fn check_hard_conflicts_json(
+    base: &ast::File,
+    left: &[patch::PatchOp],
+    right: &[patch::PatchOp],
+) -> String {
+    check_hard_conflicts(base, left, right).to_json_pretty()
+}
+
 /// Checks both hard and semantic conflicts against the same base.
 pub fn check_conflicts(
     base: &ast::File,
@@ -190,4 +199,13 @@ pub fn check_conflicts(
     right: &[patch::PatchOp],
 ) -> merge::ConflictReport {
     merge::check_conflicts(base, left, right)
+}
+
+/// Checks both hard and semantic conflicts and emits JSON.
+pub fn check_conflicts_json(
+    base: &ast::File,
+    left: &[patch::PatchOp],
+    right: &[patch::PatchOp],
+) -> String {
+    check_conflicts(base, left, right).to_json_pretty()
 }
