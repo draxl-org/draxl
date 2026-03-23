@@ -9,6 +9,28 @@ A hard conflict means the two patch streams cannot be replayed cleanly in a
 deterministic way. A semantic conflict means the patch streams can still replay,
 but the merged result may hide a meaning shift that should not pass silently.
 
+## General Rule
+
+A semantic conflict occurs when two patch streams commute structurally but not
+semantically.
+
+In practice, Draxl should look for cases where:
+
+- both branches edit different meaning-bearing regions of the same semantic
+  object
+- the edits are individually valid and structurally mergeable
+- the combined result changes multiple aspects of that object in a
+  non-independent way
+- the merged object no longer preserves a coherent meaning, contract, or
+  interpretation
+
+Typical semantic objects include:
+
+- a binding, with regions such as its name, type, initializer, and uses
+- a function, with regions such as its signature, return type, effects, and
+  body
+- an expression, with regions such as its operator, callee, and operands
+
 ## Why they matter
 
 Text-based merges often miss meaning-level overlaps.
@@ -72,11 +94,12 @@ That yields a merged result with a misleading binding name:
 }
 ```
 
-This is the core semantic-conflict pattern:
+This example is one instance of a broader semantic-conflict pattern:
 
 ```text
-one side changes the label humans rely on
-the other side changes the meaning the label points at
+one side changes one meaning-bearing projection of a semantic object
+the other side changes another projection of the same object
+the combined result remains structurally valid but loses semantic coherence
 ```
 
 ## Relation To The Git Reproduction
@@ -97,7 +120,7 @@ Today the implemented semantic rule is intentionally narrow:
 - a `let` binding rename on one side
 - an initializer-region change for the same `let` on the other side
 
-This is a small starting point, not the final design.
+This rule is a small starting point, not the final design.
 
 Future semantic rules will likely cover cases such as:
 
