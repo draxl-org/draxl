@@ -31,9 +31,8 @@ The current Rust API mirrors that split through structured `PatchOp` values,
 
 ### Node ids
 
-`@id` is a semantic locator, not a kind tag. The executor resolves the id in
-the current tree and learns the node kind from the Draxl schema plus AST
-lookup.
+`@id` names a node identity in the current tree. The executor resolves the id
+and learns the node kind from the Draxl schema plus AST lookup.
 
 ### Slot refs
 

@@ -120,7 +120,7 @@ The patch crate applies structured edit operators over the AST:
 - set and clear scalar fields
 
 The patch model is deliberately semantic, slot-aware, and attachment-aware. It
-is not a generic text rewrite layer.
+provides a structured tree edit layer over the AST.
 
 ### `draxl-cli`
 
@@ -138,8 +138,7 @@ workflows exposed to users:
 
 ### Stable ids live in source
 
-Draxl is not trying to infer identity after the fact. The source already
-contains node identity through metadata prefixes.
+Draxl carries node identity directly in source through metadata prefixes.
 
 ### Ordered children are explicit
 
@@ -153,7 +152,7 @@ The parse phase accepts the supported syntax. The validate phase decides whether
 the resulting tree satisfies the stronger semantic invariants that make
 canonical printing and patching predictable.
 
-### The CLI is not the API boundary
+### The root crate is the API boundary
 
 The root `draxl` crate is the intended integration surface for Rust callers.
-The CLI is a client of that surface, not a second copy of the same logic.
+The CLI exercises that shared surface for command-line workflows.

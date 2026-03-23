@@ -35,9 +35,8 @@ Typical semantic objects include:
 
 ## Why they matter
 
-Text-based merges often miss meaning-level overlaps.
-
-In an agent-heavy workflow, that gap gets worse:
+Text-based merges often miss meaning-level overlaps. In an agent-heavy
+workflow, that gap gets worse:
 
 - a merge may succeed even though two edits are coupled
 - the resulting code may still compile and look tidy
@@ -176,7 +175,7 @@ Today the implemented semantic rules are intentionally narrow:
 - a parameter type contract change on one side
 - body logic changes for the same function that still interpret that parameter
 
-These rules are a small starting point, not the final design.
+These rules are the initial implemented slice of the broader design.
 
 Future semantic rules will likely cover cases such as:
 

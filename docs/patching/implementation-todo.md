@@ -74,7 +74,8 @@ TODO:
   - do not rely on line splitting for fragment boundaries
 - define fragment termination rules for multiline fragments
   - balanced braces, parens, and brackets must be respected
-  - future parser should consume a full fragment, not a line suffix
+  - future parser should consume a full fragment based on structural
+    termination rules
 - define exact surface names for the currently supported scalar path subset
   - `name`
   - `text`
