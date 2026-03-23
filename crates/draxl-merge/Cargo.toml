@@ -1,0 +1,18 @@
+[package]
+name = "draxl-merge"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Merge analysis for Draxl patch streams."
+
+[dependencies]
+draxl-ast.workspace = true
+draxl-patch.workspace = true
+draxl-printer.workspace = true
+draxl-validate.workspace = true
+
+[dev-dependencies]
+draxl-parser.workspace = true

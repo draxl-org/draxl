@@ -26,6 +26,7 @@ use std::fmt;
 
 pub use draxl_ast as ast;
 pub use draxl_lower_rust as lower_rust;
+pub use draxl_merge as merge;
 pub use draxl_parser as parser;
 pub use draxl_patch as patch;
 pub use draxl_printer as printer;
@@ -171,4 +172,13 @@ pub fn apply_patch_text(
     source: &str,
 ) -> std::result::Result<(), patch::PatchTextError> {
     patch::apply_patch_text(file, source)
+}
+
+/// Checks whether two patch streams have hard conflicts against the same base.
+pub fn check_hard_conflicts(
+    base: &ast::File,
+    left: &[patch::PatchOp],
+    right: &[patch::PatchOp],
+) -> merge::HardConflictReport {
+    merge::check_hard_conflicts(base, left, right)
 }

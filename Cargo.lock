@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "draxl-ast",
  "draxl-lower-rust",
+ "draxl-merge",
  "draxl-parser",
  "draxl-patch",
  "draxl-printer",
@@ -31,6 +32,17 @@ version = "0.1.0"
 dependencies = [
  "draxl-ast",
  "draxl-printer",
+]
+
+[[package]]
+name = "draxl-merge"
+version = "0.1.0"
+dependencies = [
+ "draxl-ast",
+ "draxl-parser",
+ "draxl-patch",
+ "draxl-printer",
+ "draxl-validate",
 ]
 
 [[package]]
