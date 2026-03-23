@@ -1,8 +1,9 @@
-use crate::context::{LetRegion, TreeContext};
+use crate::context::{CallRegion, LetRegion, TreeContext};
 use crate::explain::{
-    binding_rename_vs_initializer_change_conflict, non_convergent_replay_conflict,
-    replay_failure_conflict, same_node_write_conflict, same_ranked_position_conflict,
-    same_scalar_path_write_conflict, same_single_slot_write_conflict,
+    binding_rename_vs_initializer_change_conflict, call_callee_vs_argument_change_conflict,
+    non_convergent_replay_conflict, replay_failure_conflict, same_node_write_conflict,
+    same_ranked_position_conflict, same_scalar_path_write_conflict,
+    same_single_slot_write_conflict,
 };
 use crate::model::{Conflict, ConflictReport, ReplayFailure, ReplayOrder, ReplayStage};
 use draxl_ast::File;
@@ -121,6 +122,10 @@ fn classify_semantic_conflicts(base: &File, left: &[PatchOp], right: &[PatchOp])
         for (right_index, right_op) in right.iter().enumerate() {
             let right_rename = binding_rename_target(right_op, &context);
             let right_meaning = let_initializer_change_target(right_op, &context);
+            let left_callee = call_callee_change_target(left_op, &context);
+            let left_argument = call_argument_change_target(left_op, &context);
+            let right_callee = call_callee_change_target(right_op, &context);
+            let right_argument = call_argument_change_target(right_op, &context);
 
             if let (Some(rename), Some(meaning)) = (&left_rename, &right_meaning) {
                 if rename.let_id == meaning.let_id {
@@ -144,6 +149,30 @@ fn classify_semantic_conflicts(base: &File, left: &[PatchOp], right: &[PatchOp])
                         left_op,
                         &rename.let_id,
                         &rename.binding_id,
+                    ));
+                }
+            }
+
+            if let (Some(callee), Some(argument)) = (&left_callee, &right_argument) {
+                if callee.call_id == argument.call_id {
+                    conflicts.push(call_callee_vs_argument_change_conflict(
+                        left_index,
+                        left_op,
+                        right_index,
+                        right_op,
+                        &callee.call_id,
+                    ));
+                }
+            }
+
+            if let (Some(argument), Some(callee)) = (&left_argument, &right_callee) {
+                if callee.call_id == argument.call_id {
+                    conflicts.push(call_callee_vs_argument_change_conflict(
+                        right_index,
+                        right_op,
+                        left_index,
+                        left_op,
+                        &callee.call_id,
                     ));
                 }
             }
@@ -286,6 +315,11 @@ struct LetInitializerChangeTarget {
     let_id: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CallRegionChangeTarget {
+    call_id: String,
+}
+
 fn binding_rename_target(op: &PatchOp, context: &TreeContext) -> Option<BindingRenameTarget> {
     match op {
         PatchOp::Set { path, value } if path.segments.as_slice() == ["name"] => {
@@ -351,5 +385,78 @@ fn node_in_init_region(node_id: &str, context: &TreeContext) -> Option<LetInitia
     }
     Some(LetInitializerChangeTarget {
         let_id: node.enclosing_let.clone()?,
+    })
+}
+
+fn call_callee_change_target(
+    op: &PatchOp,
+    context: &TreeContext,
+) -> Option<CallRegionChangeTarget> {
+    match op {
+        PatchOp::Put { slot, .. } => callee_slot_target(slot, context),
+        PatchOp::Move {
+            target_id,
+            dest: PatchDest::Slot(slot),
+        } => callee_slot_target(slot, context)
+            .or_else(|| node_in_call_region(target_id, context, CallRegion::Callee)),
+        PatchOp::Replace { target_id, .. }
+        | PatchOp::Delete { target_id }
+        | PatchOp::Move { target_id, .. } => {
+            node_in_call_region(target_id, context, CallRegion::Callee)
+        }
+        PatchOp::Set { path, .. } | PatchOp::Clear { path } => {
+            node_in_call_region(&path.node_id, context, CallRegion::Callee)
+        }
+        _ => None,
+    }
+}
+
+fn call_argument_change_target(
+    op: &PatchOp,
+    context: &TreeContext,
+) -> Option<CallRegionChangeTarget> {
+    match op {
+        PatchOp::Replace { target_id, .. }
+        | PatchOp::Delete { target_id }
+        | PatchOp::Move { target_id, .. } => {
+            node_in_call_region(target_id, context, CallRegion::Arg)
+        }
+        PatchOp::Set { path, .. } | PatchOp::Clear { path } => {
+            node_in_call_region(&path.node_id, context, CallRegion::Arg)
+        }
+        _ => None,
+    }
+}
+
+fn callee_slot_target(slot: &SlotRef, context: &TreeContext) -> Option<CallRegionChangeTarget> {
+    if slot.slot != "callee" {
+        return None;
+    }
+
+    let SlotOwner::Node(owner_id) = &slot.owner else {
+        return None;
+    };
+
+    let node = context.node(owner_id)?;
+    if !node.is_call_expr {
+        return None;
+    }
+
+    Some(CallRegionChangeTarget {
+        call_id: owner_id.clone(),
+    })
+}
+
+fn node_in_call_region(
+    node_id: &str,
+    context: &TreeContext,
+    region: CallRegion,
+) -> Option<CallRegionChangeTarget> {
+    let node = context.node(node_id)?;
+    if node.call_region != Some(region) {
+        return None;
+    }
+    Some(CallRegionChangeTarget {
+        call_id: node.enclosing_call.clone()?,
     })
 }

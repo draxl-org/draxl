@@ -1,6 +1,6 @@
 use draxl_merge::{check_conflicts, check_hard_conflicts, ConflictClass, ConflictCode};
 use draxl_parser::parse_expr_fragment;
-use draxl_patch::{PatchNode, PatchOp, PatchPath, PatchValue};
+use draxl_patch::{PatchNode, PatchOp, PatchPath, PatchValue, SlotOwner, SlotRef};
 use draxl_validate::validate_file;
 
 #[test]
@@ -91,6 +91,55 @@ fn ranked_insert_example_stays_clean_under_full_conflict_check() {
         "unexpected conflicts: {:?}",
         report.conflicts
     );
+}
+
+#[test]
+fn reports_call_callee_vs_argument_change_as_semantic_conflict() {
+    let source = r#"
+@m1 mod demo {
+  @f1[a] fn checkout(@p1[a] amount: @t1 u64) {
+    @s1[a] @e1 charge(@e2 amount);
+    @s2[b] @e3 audit();
+  }
+}
+"#;
+    let file = parse_source(source);
+    let left = vec![PatchOp::Put {
+        slot: SlotRef {
+            owner: SlotOwner::Node("e1".to_owned()),
+            slot: "callee".to_owned(),
+        },
+        node: PatchNode::Expr(
+            parse_expr_fragment("@e4 charge_dollars")
+                .expect("callee replacement fragment should parse"),
+        ),
+    }];
+    let right = vec![PatchOp::Replace {
+        target_id: "e2".to_owned(),
+        replacement: PatchNode::Expr(
+            parse_expr_fragment("@e2 to_cents(@e5 amount)")
+                .expect("argument replacement fragment should parse"),
+        ),
+    }];
+
+    let hard = check_hard_conflicts(&file, &left, &right);
+    assert!(
+        hard.is_clean(),
+        "unexpected hard conflicts: {:?}",
+        hard.conflicts
+    );
+
+    let report = check_conflicts(&file, &left, &right);
+    assert_eq!(report.conflicts.len(), 1);
+    assert_eq!(report.conflicts[0].class, ConflictClass::Semantic);
+    assert_eq!(
+        report.conflicts[0].code,
+        ConflictCode::CallCalleeVsArgumentChange
+    );
+    assert!(report.conflicts[0].summary.contains("@e1"));
+    assert!(report.conflicts[0].detail.contains("new call contract"));
+    assert_eq!(report.conflicts[0].left.len(), 1);
+    assert_eq!(report.conflicts[0].right.len(), 1);
 }
 
 fn parse_source(source: &str) -> draxl_ast::File {

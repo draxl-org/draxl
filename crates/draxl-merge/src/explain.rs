@@ -177,6 +177,35 @@ pub(crate) fn binding_rename_vs_initializer_change_conflict(
     }
 }
 
+pub(crate) fn call_callee_vs_argument_change_conflict(
+    left_index: usize,
+    left_op: &PatchOp,
+    right_index: usize,
+    right_op: &PatchOp,
+    call_id: &str,
+) -> Conflict {
+    Conflict {
+        class: ConflictClass::Semantic,
+        code: ConflictCode::CallCalleeVsArgumentChange,
+        summary: format!(
+            "one side changes the callee while the other changes argument meaning in `{}`",
+            node_label(call_id)
+        ),
+        detail: format!(
+            "These edits are structurally mergeable, but they should be reviewed together. \
+             The left patch stream changes the callee region of call `{}`, while the right patch stream changes an argument region of the same call. \
+             That means the merged code may pair a new call contract with an argument value that still follows the old representation.",
+            node_label(call_id)
+        ),
+        left: vec![summarize_side(left_index, left_op)],
+        right: vec![summarize_side(right_index, right_op)],
+        remediation: Some(
+            "review the call contract against the merged argument representation and update them together"
+                .to_owned(),
+        ),
+    }
+}
+
 fn replay_failure_text(failure: &ReplayFailure) -> (String, String) {
     let order = match failure.order {
         ReplayOrder::LeftThenRight => "left then right",

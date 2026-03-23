@@ -63,6 +63,74 @@ const EXPECTED_MERGED_SOURCE: &str = r#"fn price(amount: Cents) -> Cents {
 }
 "#;
 
+const CALL_BASE_SOURCE: &str = r#"fn charge(_amount: u64) {}
+fn charge_dollars(_amount: u64) {}
+fn to_cents(amount: u64) -> u64 { amount * 100 }
+fn normalize(amount: u64) -> u64 { amount }
+fn audit() {}
+
+fn checkout(amount: u64) {
+    charge(
+        normalize(
+            amount
+        )
+    );
+
+    audit();
+}
+"#;
+
+const CALL_CALLEE_SOURCE: &str = r#"fn charge(_amount: u64) {}
+fn charge_dollars(_amount: u64) {}
+fn to_cents(amount: u64) -> u64 { amount * 100 }
+fn normalize(amount: u64) -> u64 { amount }
+fn audit() {}
+
+fn checkout(amount: u64) {
+    charge_dollars(
+        normalize(
+            amount
+        )
+    );
+
+    audit();
+}
+"#;
+
+const CALL_ARGUMENT_SOURCE: &str = r#"fn charge(_amount: u64) {}
+fn charge_dollars(_amount: u64) {}
+fn to_cents(amount: u64) -> u64 { amount * 100 }
+fn normalize(amount: u64) -> u64 { amount }
+fn audit() {}
+
+fn checkout(amount: u64) {
+    charge(
+        normalize(
+            to_cents(amount)
+        )
+    );
+
+    audit();
+}
+"#;
+
+const EXPECTED_CALL_MERGED_SOURCE: &str = r#"fn charge(_amount: u64) {}
+fn charge_dollars(_amount: u64) {}
+fn to_cents(amount: u64) -> u64 { amount * 100 }
+fn normalize(amount: u64) -> u64 { amount }
+fn audit() {}
+
+fn checkout(amount: u64) {
+    charge_dollars(
+        normalize(
+            to_cents(amount)
+        )
+    );
+
+    audit();
+}
+"#;
+
 // This fixture is intentionally shaped so Git's text merge succeeds even though
 // the merged result combines two semantically coupled edits that should be
 // reviewed together.
@@ -125,6 +193,71 @@ fn git_merges_semantic_conflict_without_reporting_a_text_conflict() {
 
     let merged = repo.read_file("price.rs");
     assert_eq!(merged, EXPECTED_MERGED_SOURCE);
+    assert!(
+        !merged.contains("<<<<<<<"),
+        "merged file unexpectedly contains conflict markers:\n{merged}"
+    );
+}
+
+#[test]
+fn git_merges_call_contract_semantic_conflict_without_reporting_a_text_conflict() {
+    let repo = TempGitRepo::new();
+    repo.write_file("checkout.rs", CALL_BASE_SOURCE);
+    repo.git_ok(&["init", "-q"]);
+    repo.git_ok(&["add", "checkout.rs"]);
+    repo.git_ok(&[
+        "-c",
+        "user.name=Codex",
+        "-c",
+        "user.email=codex@example.com",
+        "commit",
+        "-q",
+        "-m",
+        "base",
+    ]);
+
+    let base_branch = repo.git_stdout(&["branch", "--show-current"]);
+    let base_branch = base_branch.trim();
+
+    repo.git_ok(&["checkout", "-q", "-b", "callee-branch"]);
+    repo.write_file("checkout.rs", CALL_CALLEE_SOURCE);
+    repo.git_ok(&["add", "checkout.rs"]);
+    repo.git_ok(&[
+        "-c",
+        "user.name=Codex",
+        "-c",
+        "user.email=codex@example.com",
+        "commit",
+        "-q",
+        "-m",
+        "change callee contract",
+    ]);
+
+    repo.git_ok(&["checkout", "-q", base_branch]);
+    repo.git_ok(&["checkout", "-q", "-b", "argument-branch"]);
+    repo.write_file("checkout.rs", CALL_ARGUMENT_SOURCE);
+    repo.git_ok(&["add", "checkout.rs"]);
+    repo.git_ok(&[
+        "-c",
+        "user.name=Codex",
+        "-c",
+        "user.email=codex@example.com",
+        "commit",
+        "-q",
+        "-m",
+        "change argument representation",
+    ]);
+
+    let merge = repo.git(&["merge", "callee-branch"]);
+    assert!(
+        merge.status.success(),
+        "expected merge success\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&merge.stdout),
+        String::from_utf8_lossy(&merge.stderr)
+    );
+
+    let merged = repo.read_file("checkout.rs");
+    assert_eq!(merged, EXPECTED_CALL_MERGED_SOURCE);
     assert!(
         !merged.contains("<<<<<<<"),
         "merged file unexpectedly contains conflict markers:\n{merged}"

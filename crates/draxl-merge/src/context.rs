@@ -10,7 +10,7 @@ impl TreeContext {
     pub(crate) fn build(file: &File) -> Self {
         let mut context = Self::default();
         for item in &file.items {
-            visit_item(&mut context, item, None, None, None, false);
+            visit_item(&mut context, item, None, None, None, None, None, false);
         }
         context
     }
@@ -26,8 +26,11 @@ pub(crate) struct NodeContext {
     pub parent_id: Option<String>,
     pub enclosing_let: Option<String>,
     pub let_region: Option<LetRegion>,
+    pub enclosing_call: Option<String>,
+    pub call_region: Option<CallRegion>,
     pub is_let_binding: bool,
     pub is_let_stmt: bool,
+    pub is_call_expr: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,12 +39,20 @@ pub(crate) enum LetRegion {
     Init,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CallRegion {
+    Callee,
+    Arg,
+}
+
 fn visit_item(
     context: &mut TreeContext,
     item: &Item,
     parent_id: Option<&str>,
     enclosing_let: Option<&str>,
     let_region: Option<LetRegion>,
+    enclosing_call: Option<&str>,
+    call_region: Option<CallRegion>,
     is_let_binding: bool,
 ) {
     let item_id = item.meta().id.as_str();
@@ -51,7 +62,10 @@ fn visit_item(
         parent_id,
         enclosing_let,
         let_region,
+        enclosing_call,
+        call_region,
         is_let_binding,
+        false,
         false,
     );
 
@@ -64,6 +78,8 @@ fn visit_item(
                     Some(item_id),
                     enclosing_let,
                     let_region,
+                    enclosing_call,
+                    call_region,
                     false,
                 );
             }
@@ -76,6 +92,8 @@ fn visit_item(
                     Some(field.meta.id.as_str()),
                     enclosing_let,
                     let_region,
+                    enclosing_call,
+                    call_region,
                 );
             }
         }
@@ -88,6 +106,9 @@ fn visit_item(
                     Some(item_id),
                     enclosing_let,
                     let_region,
+                    enclosing_call,
+                    call_region,
+                    false,
                     false,
                     false,
                 );
@@ -97,11 +118,21 @@ fn visit_item(
                     Some(param.meta.id.as_str()),
                     enclosing_let,
                     let_region,
+                    enclosing_call,
+                    call_region,
                 );
             }
 
             if let Some(ret_ty) = &node.ret_ty {
-                visit_type(context, ret_ty, Some(item_id), enclosing_let, let_region);
+                visit_type(
+                    context,
+                    ret_ty,
+                    Some(item_id),
+                    enclosing_let,
+                    let_region,
+                    enclosing_call,
+                    call_region,
+                );
             }
 
             visit_block(
@@ -110,6 +141,8 @@ fn visit_item(
                 Some(item_id),
                 enclosing_let,
                 let_region,
+                enclosing_call,
+                call_region,
             );
         }
     }
@@ -121,6 +154,8 @@ fn visit_block(
     parent_id: Option<&str>,
     enclosing_let: Option<&str>,
     let_region: Option<LetRegion>,
+    enclosing_call: Option<&str>,
+    call_region: Option<CallRegion>,
 ) {
     let block_parent = match &block.meta {
         Some(meta) => {
@@ -130,6 +165,9 @@ fn visit_block(
                 parent_id,
                 enclosing_let,
                 let_region,
+                enclosing_call,
+                call_region,
+                false,
                 false,
                 false,
             );
@@ -139,7 +177,15 @@ fn visit_block(
     };
 
     for stmt in &block.stmts {
-        visit_stmt(context, stmt, block_parent, enclosing_let, let_region);
+        visit_stmt(
+            context,
+            stmt,
+            block_parent,
+            enclosing_let,
+            let_region,
+            enclosing_call,
+            call_region,
+        );
     }
 }
 
@@ -149,9 +195,19 @@ fn visit_stmt(
     parent_id: Option<&str>,
     enclosing_let: Option<&str>,
     let_region: Option<LetRegion>,
+    enclosing_call: Option<&str>,
+    call_region: Option<CallRegion>,
 ) {
     match stmt {
-        Stmt::Let(node) => visit_let_stmt(context, node, parent_id, enclosing_let, let_region),
+        Stmt::Let(node) => visit_let_stmt(
+            context,
+            node,
+            parent_id,
+            enclosing_let,
+            let_region,
+            enclosing_call,
+            call_region,
+        ),
         Stmt::Expr(node) => {
             register_node(
                 context,
@@ -159,6 +215,9 @@ fn visit_stmt(
                 parent_id,
                 enclosing_let,
                 let_region,
+                enclosing_call,
+                call_region,
+                false,
                 false,
                 false,
             );
@@ -168,15 +227,29 @@ fn visit_stmt(
                 Some(node.meta.id.as_str()),
                 enclosing_let,
                 let_region,
+                enclosing_call,
+                call_region,
             );
         }
-        Stmt::Item(item) => visit_item(context, item, parent_id, enclosing_let, let_region, false),
+        Stmt::Item(item) => visit_item(
+            context,
+            item,
+            parent_id,
+            enclosing_let,
+            let_region,
+            enclosing_call,
+            call_region,
+            false,
+        ),
         Stmt::Doc(node) => register_node(
             context,
             &node.meta.id,
             parent_id,
             enclosing_let,
             let_region,
+            enclosing_call,
+            call_region,
+            false,
             false,
             false,
         ),
@@ -186,6 +259,9 @@ fn visit_stmt(
             parent_id,
             enclosing_let,
             let_region,
+            enclosing_call,
+            call_region,
+            false,
             false,
             false,
         ),
@@ -198,6 +274,8 @@ fn visit_let_stmt(
     parent_id: Option<&str>,
     enclosing_let: Option<&str>,
     let_region: Option<LetRegion>,
+    enclosing_call: Option<&str>,
+    call_region: Option<CallRegion>,
 ) {
     let let_id = node.meta.id.as_str();
     register_node(
@@ -206,8 +284,11 @@ fn visit_let_stmt(
         parent_id,
         enclosing_let,
         let_region,
+        enclosing_call,
+        call_region,
         false,
         true,
+        false,
     );
     visit_pattern(
         context,
@@ -215,6 +296,8 @@ fn visit_let_stmt(
         Some(let_id),
         Some(let_id),
         Some(LetRegion::Pattern),
+        enclosing_call,
+        call_region,
         true,
     );
     visit_expr(
@@ -223,6 +306,8 @@ fn visit_let_stmt(
         Some(let_id),
         Some(let_id),
         Some(LetRegion::Init),
+        enclosing_call,
+        call_region,
     );
 }
 
@@ -232,6 +317,8 @@ fn visit_pattern(
     parent_id: Option<&str>,
     enclosing_let: Option<&str>,
     let_region: Option<LetRegion>,
+    enclosing_call: Option<&str>,
+    call_region: Option<CallRegion>,
     is_let_binding: bool,
 ) {
     match pattern {
@@ -243,7 +330,10 @@ fn visit_pattern(
                     parent_id,
                     enclosing_let,
                     let_region,
+                    enclosing_call,
+                    call_region,
                     is_let_binding,
+                    false,
                     false,
                 );
             }
@@ -256,6 +346,9 @@ fn visit_pattern(
                     parent_id,
                     enclosing_let,
                     let_region,
+                    enclosing_call,
+                    call_region,
+                    false,
                     false,
                     false,
                 );
@@ -270,6 +363,8 @@ fn visit_expr(
     parent_id: Option<&str>,
     enclosing_let: Option<&str>,
     let_region: Option<LetRegion>,
+    enclosing_call: Option<&str>,
+    call_region: Option<CallRegion>,
 ) {
     let expr_parent = match expr.meta() {
         Some(meta) => {
@@ -279,8 +374,11 @@ fn visit_expr(
                 parent_id,
                 enclosing_let,
                 let_region,
+                enclosing_call,
+                call_region,
                 false,
                 false,
+                matches!(expr, Expr::Call(_)),
             );
             Some(meta.id.as_str())
         }
@@ -290,25 +388,68 @@ fn visit_expr(
     match expr {
         Expr::Path(_) | Expr::Lit(_) => {}
         Expr::Group(node) => {
-            visit_expr(context, &node.expr, expr_parent, enclosing_let, let_region);
+            visit_expr(
+                context,
+                &node.expr,
+                expr_parent,
+                enclosing_let,
+                let_region,
+                enclosing_call,
+                call_region,
+            );
         }
         Expr::Binary(node) => {
-            visit_expr(context, &node.lhs, expr_parent, enclosing_let, let_region);
-            visit_expr(context, &node.rhs, expr_parent, enclosing_let, let_region);
+            visit_expr(
+                context,
+                &node.lhs,
+                expr_parent,
+                enclosing_let,
+                let_region,
+                enclosing_call,
+                call_region,
+            );
+            visit_expr(
+                context,
+                &node.rhs,
+                expr_parent,
+                enclosing_let,
+                let_region,
+                enclosing_call,
+                call_region,
+            );
         }
         Expr::Unary(node) => {
-            visit_expr(context, &node.expr, expr_parent, enclosing_let, let_region);
+            visit_expr(
+                context,
+                &node.expr,
+                expr_parent,
+                enclosing_let,
+                let_region,
+                enclosing_call,
+                call_region,
+            );
         }
         Expr::Call(node) => {
+            let current_call = expr.meta().map(|meta| meta.id.as_str()).or(enclosing_call);
             visit_expr(
                 context,
                 &node.callee,
                 expr_parent,
                 enclosing_let,
                 let_region,
+                current_call,
+                Some(CallRegion::Callee),
             );
             for arg in &node.args {
-                visit_expr(context, arg, expr_parent, enclosing_let, let_region);
+                visit_expr(
+                    context,
+                    arg,
+                    expr_parent,
+                    enclosing_let,
+                    let_region,
+                    current_call,
+                    Some(CallRegion::Arg),
+                );
             }
         }
         Expr::Match(node) => {
@@ -318,12 +459,30 @@ fn visit_expr(
                 expr_parent,
                 enclosing_let,
                 let_region,
+                enclosing_call,
+                call_region,
             );
             for arm in &node.arms {
-                visit_match_arm(context, arm, expr_parent, enclosing_let, let_region);
+                visit_match_arm(
+                    context,
+                    arm,
+                    expr_parent,
+                    enclosing_let,
+                    let_region,
+                    enclosing_call,
+                    call_region,
+                );
             }
         }
-        Expr::Block(block) => visit_block(context, block, expr_parent, enclosing_let, let_region),
+        Expr::Block(block) => visit_block(
+            context,
+            block,
+            expr_parent,
+            enclosing_let,
+            let_region,
+            enclosing_call,
+            call_region,
+        ),
     }
 }
 
@@ -333,6 +492,8 @@ fn visit_match_arm(
     parent_id: Option<&str>,
     enclosing_let: Option<&str>,
     let_region: Option<LetRegion>,
+    enclosing_call: Option<&str>,
+    call_region: Option<CallRegion>,
 ) {
     let arm_id = arm.meta.id.as_str();
     register_node(
@@ -341,6 +502,9 @@ fn visit_match_arm(
         parent_id,
         enclosing_let,
         let_region,
+        enclosing_call,
+        call_region,
+        false,
         false,
         false,
     );
@@ -350,12 +514,30 @@ fn visit_match_arm(
         Some(arm_id),
         enclosing_let,
         let_region,
+        enclosing_call,
+        call_region,
         false,
     );
     if let Some(guard) = &arm.guard {
-        visit_expr(context, guard, Some(arm_id), enclosing_let, let_region);
+        visit_expr(
+            context,
+            guard,
+            Some(arm_id),
+            enclosing_let,
+            let_region,
+            enclosing_call,
+            call_region,
+        );
     }
-    visit_expr(context, &arm.body, Some(arm_id), enclosing_let, let_region);
+    visit_expr(
+        context,
+        &arm.body,
+        Some(arm_id),
+        enclosing_let,
+        let_region,
+        enclosing_call,
+        call_region,
+    );
 }
 
 fn visit_type(
@@ -364,6 +546,8 @@ fn visit_type(
     parent_id: Option<&str>,
     enclosing_let: Option<&str>,
     let_region: Option<LetRegion>,
+    enclosing_call: Option<&str>,
+    call_region: Option<CallRegion>,
 ) {
     register_node(
         context,
@@ -371,6 +555,9 @@ fn visit_type(
         parent_id,
         enclosing_let,
         let_region,
+        enclosing_call,
+        call_region,
+        false,
         false,
         false,
     );
@@ -382,8 +569,11 @@ fn register_node(
     parent_id: Option<&str>,
     enclosing_let: Option<&str>,
     let_region: Option<LetRegion>,
+    enclosing_call: Option<&str>,
+    call_region: Option<CallRegion>,
     is_let_binding: bool,
     is_let_stmt: bool,
+    is_call_expr: bool,
 ) {
     context.nodes.insert(
         node_id.to_owned(),
@@ -391,8 +581,11 @@ fn register_node(
             parent_id: parent_id.map(str::to_owned),
             enclosing_let: enclosing_let.map(str::to_owned),
             let_region,
+            enclosing_call: enclosing_call.map(str::to_owned),
+            call_region,
             is_let_binding,
             is_let_stmt,
+            is_call_expr,
         },
     );
 }
