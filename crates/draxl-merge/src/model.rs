@@ -1,0 +1,159 @@
+use std::fmt;
+
+/// Outcome of checking two patch streams for hard conflicts.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct HardConflictReport {
+    /// Hard conflicts found while comparing the two patch streams.
+    pub conflicts: Vec<Conflict>,
+}
+
+impl HardConflictReport {
+    /// Returns true when no hard conflicts were found.
+    pub fn is_clean(&self) -> bool {
+        self.conflicts.is_empty()
+    }
+
+    /// Returns true when at least one hard conflict was found.
+    pub fn has_conflicts(&self) -> bool {
+        !self.is_clean()
+    }
+}
+
+impl fmt::Display for HardConflictReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.conflicts.is_empty() {
+            return f.write_str("no hard conflicts");
+        }
+
+        for (index, conflict) in self.conflicts.iter().enumerate() {
+            if index > 0 {
+                f.write_str("\n\n")?;
+            }
+            conflict.fmt(f)?;
+        }
+        Ok(())
+    }
+}
+
+/// Structured conflict explanation suitable for humans and agents.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Conflict {
+    /// Broad conflict class.
+    pub class: ConflictClass,
+    /// Stable conflict code.
+    pub code: ConflictCode,
+    /// Short one-line summary.
+    pub summary: String,
+    /// Richer explanation of why the conflict exists.
+    pub detail: String,
+    /// Relevant left-side operations.
+    pub left: Vec<ConflictSide>,
+    /// Relevant right-side operations.
+    pub right: Vec<ConflictSide>,
+    /// Suggested next step.
+    pub remediation: Option<String>,
+}
+
+impl fmt::Display for Conflict {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "[{:?}:{:?}] {}", self.class, self.code, self.summary)?;
+        writeln!(f, "{}", self.detail)?;
+
+        if !self.left.is_empty() {
+            writeln!(f, "left:")?;
+            for side in &self.left {
+                writeln!(f, "- {}", side)?;
+            }
+        }
+
+        if !self.right.is_empty() {
+            writeln!(f, "right:")?;
+            for side in &self.right {
+                writeln!(f, "- {}", side)?;
+            }
+        }
+
+        if let Some(remediation) = &self.remediation {
+            write!(f, "next: {remediation}")?;
+        }
+
+        Ok(())
+    }
+}
+
+/// Broad conflict class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConflictClass {
+    /// Hard conflicts stop deterministic auto-merge.
+    Hard,
+    /// Semantic conflicts are structurally mergeable but still need review.
+    Semantic,
+}
+
+/// Stable conflict code for reporting and downstream handling.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConflictCode {
+    /// Both sides wrote the same node shell in incompatible ways.
+    SameNodeWrite,
+    /// Both sides wrote the same scalar path in incompatible ways.
+    SameScalarPathWrite,
+    /// Both sides wrote the same single-child slot in incompatible ways.
+    SameSingleSlotWrite,
+    /// Both sides targeted the same ranked destination position.
+    SameRankedPosition,
+    /// Replay failed before convergence could be established.
+    ReplayFailure,
+    /// Both replay orders succeeded but the final ASTs diverged.
+    NonConvergentReplay,
+}
+
+/// Relevant operation from one side of the conflict.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConflictSide {
+    /// Index inside the original patch stream.
+    pub op_index: usize,
+    /// Public patch op kind such as `replace` or `insert`.
+    pub op_kind: &'static str,
+    /// Compact target label such as `@e2` or `@f1.body[ah]`.
+    pub target: String,
+    /// Richer description of the operation.
+    pub description: String,
+}
+
+impl fmt::Display for ConflictSide {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "op {} `{}` on {}: {}",
+            self.op_index, self.op_kind, self.target, self.description
+        )
+    }
+}
+
+/// Replay order used for hard-conflict checking.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReplayOrder {
+    /// Apply left, then right.
+    LeftThenRight,
+    /// Apply right, then left.
+    RightThenLeft,
+}
+
+/// Replay stage that failed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReplayStage {
+    /// Failed while applying the indexed left-side op.
+    LeftOp(usize),
+    /// Failed while applying the indexed right-side op.
+    RightOp(usize),
+    /// Failed after patch replay during structural validation.
+    Validation,
+}
+
+/// Internal replay failure used while classifying conflicts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ReplayFailure {
+    pub order: ReplayOrder,
+    pub stage: ReplayStage,
+    pub message: String,
+}

@@ -1,4 +1,4 @@
-use draxl_merge::{check_hard_conflicts, HardConflict, ReplayStage};
+use draxl_merge::{check_hard_conflicts, ConflictCode};
 use draxl_parser::{parse_expr_fragment, parse_stmt_fragment};
 use draxl_patch::{PatchNode, PatchOp, RankedDest, SlotOwner, SlotRef};
 use draxl_validate::validate_file;
@@ -24,7 +24,11 @@ fn reports_non_convergent_replace_operations_as_hard_conflicts() {
     let report = check_hard_conflicts(&file, &left, &right);
 
     assert!(report.has_conflicts());
-    assert_eq!(report.conflicts, vec![HardConflict::NonConvergentResults]);
+    assert_eq!(report.conflicts.len(), 1);
+    assert_eq!(report.conflicts[0].code, ConflictCode::SameNodeWrite);
+    assert!(report.conflicts[0].summary.contains("@e2"));
+    assert_eq!(report.conflicts[0].left.len(), 1);
+    assert_eq!(report.conflicts[0].right.len(), 1);
 }
 
 #[test]
@@ -58,14 +62,11 @@ fn reports_duplicate_rank_inserts_as_hard_conflicts() {
     let report = check_hard_conflicts(&file, &left, &right);
 
     assert!(report.has_conflicts());
-    assert_eq!(report.conflicts.len(), 2);
-    assert!(report.conflicts.iter().all(|conflict| matches!(
-        conflict,
-        HardConflict::ReplayFailed {
-            stage: ReplayStage::Validation,
-            ..
-        }
-    )));
+    assert_eq!(report.conflicts.len(), 1);
+    assert_eq!(report.conflicts[0].code, ConflictCode::SameRankedPosition);
+    assert!(report.conflicts[0].summary.contains("@f4.body[ah]"));
+    assert_eq!(report.conflicts[0].left.len(), 1);
+    assert_eq!(report.conflicts[0].right.len(), 1);
 }
 
 #[test]
