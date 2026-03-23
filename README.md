@@ -135,6 +135,10 @@ ranked slots instead of guessing intent from lines and spans.
 | Branches and forks     | repeated rebase repair    | semantic replay by identity  |
 | Merge conflicts        | overlapping text          | overlapping semantic regions |
 
+Draxl distinguishes between hard conflicts and semantic conflicts. For the
+current terminology and examples, see
+[docs/semantic-conflicts.md](docs/semantic-conflicts.md).
+
 ## Semantic patching
 
 Draxl treats semantic patch operators as first-class infrastructure for
@@ -261,6 +265,11 @@ Merged result:
 The edits compose cleanly because they target different semantic regions: one
 addresses the ranked body slot and the other replaces node `@e2`.
 
+Not every merge-relevant overlap is a hard conflict. Draxl also tracks semantic
+conflicts: cases where the patch streams remain structurally mergeable but the
+combined result should still be reviewed. See
+[docs/semantic-conflicts.md](docs/semantic-conflicts.md).
+
 ## What works today
 
 Draxl currently implements the Rust profile through `.rs.dx` files
@@ -279,6 +288,8 @@ The current milestone supports:
 - applying semantic patch ops over ids, schema-defined slots, attachments, and
   the current scalar path subset: names, trivia text, operators, and statement
   semicolon state
+- checking hard conflicts and the first semantic conflict class over pairs of
+  patch streams through `draxl-merge` and the root facade
 
 ## Architecture
 
@@ -292,6 +303,8 @@ The current workspace is intentionally split by responsibility:
 - `draxl-lower-rust`: lowering from validated Draxl to ordinary Rust
 - `draxl-patch`: structured patch operators over ids, profile-defined slots,
   attachments, and scalar paths
+- `draxl-merge`: merge analysis over patch streams, including hard conflicts
+  and initial semantic conflict rules
 - `draxl-cli`: command-line entry point
 
 ```text
@@ -311,6 +324,7 @@ More detail:
 - [docs/syntax.md](docs/syntax.md)
 - [docs/patching.md](docs/patching.md)
 - [docs/patch-op-syntax.md](docs/patch-op-syntax.md)
+- [docs/semantic-conflicts.md](docs/semantic-conflicts.md)
 
 ## Library crate
 
