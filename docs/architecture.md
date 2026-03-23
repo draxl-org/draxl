@@ -98,8 +98,8 @@ The printer has two jobs:
 - canonicalize ordered children and comment/doc placement
 - render the AST back into canonical Draxl source
 
-That split is important because stable formatting is one of the core repository
-claims.
+Stable formatting is one of the core repository claims, so canonicalization and
+rendering stay separate.
 
 ### `draxl-lower-rust`
 

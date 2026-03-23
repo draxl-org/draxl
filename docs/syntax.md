@@ -132,5 +132,5 @@ Canonical printing always emits metadata in this order:
 @id[rank]->anchor
 ```
 
-That stability matters because Draxl is intended to be edited repeatedly by
-tools, not only read once by a compiler front end.
+Draxl needs that stability because tools edit the same file repeatedly instead
+of reading it once like a compiler front end.

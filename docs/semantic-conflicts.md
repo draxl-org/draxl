@@ -5,8 +5,6 @@ Draxl uses two different conflict classes during merge analysis:
 - **hard conflicts** stop deterministic auto-merge
 - **semantic conflicts** are structurally mergeable but still require review
 
-That distinction matters.
-
 A hard conflict means the two patch streams cannot be replayed cleanly in a
 deterministic way. A semantic conflict means the patch streams can still replay,
 but the merged result may hide a meaning shift that should not pass silently.
@@ -15,7 +13,7 @@ but the merged result may hide a meaning shift that should not pass silently.
 
 Text-based merges often miss meaning-level overlaps.
 
-That becomes more important in an agent-heavy workflow:
+In an agent-heavy workflow, that gap gets worse:
 
 - a merge may succeed even though two edits are coupled
 - the resulting code may still compile and look tidy
@@ -118,5 +116,5 @@ Each rule should report:
 - which binding, node, or region is involved
 - what the reviewer should look at next
 
-That requirement matters especially for AI agents. A semantic conflict is only
-useful if the system explains why it was raised.
+AI agents especially need that explanation. A semantic conflict is only useful
+if the system explains why it was raised.

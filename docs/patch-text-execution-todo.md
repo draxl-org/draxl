@@ -147,11 +147,8 @@ The patch frontend can then choose the right helper during resolution.
 
 ### 4. Introduce a profile schema layer for patch resolution
 
-This is the most important missing abstraction.
-
-Right now slot/path knowledge is spread across executor modules. Executable
-patch text needs one source of truth for:
-
+Executable patch text needs a profile schema layer because slot/path knowledge
+is currently spread across executor modules. It needs one source of truth for:
 - public slot names
 - ranked vs single-child slots
 - allowed fragment kind for each slot
