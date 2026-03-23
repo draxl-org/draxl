@@ -1,20 +1,30 @@
+use crate::context::{LetRegion, TreeContext};
 use crate::explain::{
-    non_convergent_replay_conflict, replay_failure_conflict, same_node_write_conflict,
-    same_ranked_position_conflict, same_scalar_path_write_conflict,
-    same_single_slot_write_conflict,
+    binding_rename_vs_initializer_change_conflict, non_convergent_replay_conflict,
+    replay_failure_conflict, same_node_write_conflict, same_ranked_position_conflict,
+    same_scalar_path_write_conflict, same_single_slot_write_conflict,
 };
-use crate::model::{Conflict, HardConflictReport, ReplayFailure, ReplayOrder, ReplayStage};
+use crate::model::{Conflict, ConflictReport, ReplayFailure, ReplayOrder, ReplayStage};
 use draxl_ast::File;
-use draxl_patch::{apply_op, PatchDest, PatchOp, RankedDest, SlotRef};
+use draxl_patch::{apply_op, PatchDest, PatchOp, PatchValue, RankedDest, SlotOwner, SlotRef};
 use draxl_printer::canonicalize_file;
 use draxl_validate::validate_file;
 
+/// Checks both hard and semantic conflicts against the same base.
+pub fn check_conflicts(base: &File, left: &[PatchOp], right: &[PatchOp]) -> ConflictReport {
+    let hard = check_hard_conflicts(base, left, right);
+    if hard.has_conflicts() {
+        return hard;
+    }
+
+    let semantic_conflicts = classify_semantic_conflicts(base, left, right);
+    ConflictReport {
+        conflicts: semantic_conflicts,
+    }
+}
+
 /// Checks whether two patch streams have hard conflicts against the same base.
-pub fn check_hard_conflicts(
-    base: &File,
-    left: &[PatchOp],
-    right: &[PatchOp],
-) -> HardConflictReport {
+pub fn check_hard_conflicts(base: &File, left: &[PatchOp], right: &[PatchOp]) -> ConflictReport {
     let left_then_right = replay(base, ReplayOrder::LeftThenRight, left, right);
     let right_then_left = replay(base, ReplayOrder::RightThenLeft, right, left);
 
@@ -22,7 +32,7 @@ pub fn check_hard_conflicts(
         if canonicalize_file(left_then_right).without_spans()
             == canonicalize_file(right_then_left).without_spans()
         {
-            return HardConflictReport::default();
+            return ConflictReport::default();
         }
     }
 
@@ -43,7 +53,7 @@ pub fn check_hard_conflicts(
         }
     }
 
-    HardConflictReport { conflicts }
+    ConflictReport { conflicts }
 }
 
 fn classify_pairwise_conflicts(left: &[PatchOp], right: &[PatchOp]) -> Vec<Conflict> {
@@ -93,6 +103,49 @@ fn classify_pairwise_conflicts(left: &[PatchOp], right: &[PatchOp]) -> Vec<Confl
                     right_op,
                     &node_id,
                 ));
+            }
+        }
+    }
+
+    conflicts
+}
+
+fn classify_semantic_conflicts(base: &File, left: &[PatchOp], right: &[PatchOp]) -> Vec<Conflict> {
+    let context = TreeContext::build(base);
+    let mut conflicts = Vec::new();
+
+    for (left_index, left_op) in left.iter().enumerate() {
+        let left_rename = binding_rename_target(left_op, &context);
+        let left_meaning = let_initializer_change_target(left_op, &context);
+
+        for (right_index, right_op) in right.iter().enumerate() {
+            let right_rename = binding_rename_target(right_op, &context);
+            let right_meaning = let_initializer_change_target(right_op, &context);
+
+            if let (Some(rename), Some(meaning)) = (&left_rename, &right_meaning) {
+                if rename.let_id == meaning.let_id {
+                    conflicts.push(binding_rename_vs_initializer_change_conflict(
+                        left_index,
+                        left_op,
+                        right_index,
+                        right_op,
+                        &rename.let_id,
+                        &rename.binding_id,
+                    ));
+                }
+            }
+
+            if let (Some(meaning), Some(rename)) = (&left_meaning, &right_rename) {
+                if rename.let_id == meaning.let_id {
+                    conflicts.push(binding_rename_vs_initializer_change_conflict(
+                        right_index,
+                        right_op,
+                        left_index,
+                        left_op,
+                        &rename.let_id,
+                        &rename.binding_id,
+                    ));
+                }
             }
         }
     }
@@ -220,4 +273,83 @@ fn format_validation_errors(errors: &[draxl_validate::ValidationError]) -> Strin
         message.push_str(&error.message);
     }
     message
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BindingRenameTarget {
+    let_id: String,
+    binding_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct LetInitializerChangeTarget {
+    let_id: String,
+}
+
+fn binding_rename_target(op: &PatchOp, context: &TreeContext) -> Option<BindingRenameTarget> {
+    match op {
+        PatchOp::Set { path, value } if path.segments.as_slice() == ["name"] => {
+            let PatchValue::Ident(_) = value else {
+                return None;
+            };
+            let node = context.node(&path.node_id)?;
+            if !node.is_let_binding {
+                return None;
+            }
+            Some(BindingRenameTarget {
+                let_id: node.enclosing_let.clone()?,
+                binding_id: path.node_id.clone(),
+            })
+        }
+        _ => None,
+    }
+}
+
+fn let_initializer_change_target(
+    op: &PatchOp,
+    context: &TreeContext,
+) -> Option<LetInitializerChangeTarget> {
+    match op {
+        PatchOp::Put { slot, .. } => init_slot_target(slot, context),
+        PatchOp::Move {
+            target_id,
+            dest: PatchDest::Slot(slot),
+        } => init_slot_target(slot, context).or_else(|| node_in_init_region(target_id, context)),
+        PatchOp::Replace { target_id, .. }
+        | PatchOp::Delete { target_id }
+        | PatchOp::Move { target_id, .. } => node_in_init_region(target_id, context),
+        PatchOp::Set { path, .. } | PatchOp::Clear { path } => {
+            node_in_init_region(&path.node_id, context)
+        }
+        _ => None,
+    }
+}
+
+fn init_slot_target(slot: &SlotRef, context: &TreeContext) -> Option<LetInitializerChangeTarget> {
+    if slot.slot != "init" {
+        return None;
+    }
+
+    let SlotOwner::Node(owner_id) = &slot.owner else {
+        return None;
+    };
+
+    let node = context.node(owner_id)?;
+    if !node.is_let_stmt {
+        return None;
+    }
+
+    Some(LetInitializerChangeTarget {
+        let_id: owner_id.clone(),
+    })
+}
+
+fn node_in_init_region(node_id: &str, context: &TreeContext) -> Option<LetInitializerChangeTarget> {
+    let node = context.node(node_id)?;
+    if node.let_region != Some(LetRegion::Init) {
+        return None;
+    }
+    Some(LetInitializerChangeTarget {
+        let_id: node.enclosing_let.clone()?,
+    })
 }

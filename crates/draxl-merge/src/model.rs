@@ -1,28 +1,28 @@
 use std::fmt;
 
-/// Outcome of checking two patch streams for hard conflicts.
+/// Outcome of checking two patch streams for merge conflicts.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct HardConflictReport {
-    /// Hard conflicts found while comparing the two patch streams.
+pub struct ConflictReport {
+    /// Conflicts found while comparing the two patch streams.
     pub conflicts: Vec<Conflict>,
 }
 
-impl HardConflictReport {
-    /// Returns true when no hard conflicts were found.
+impl ConflictReport {
+    /// Returns true when no conflicts were found.
     pub fn is_clean(&self) -> bool {
         self.conflicts.is_empty()
     }
 
-    /// Returns true when at least one hard conflict was found.
+    /// Returns true when at least one conflict was found.
     pub fn has_conflicts(&self) -> bool {
         !self.is_clean()
     }
 }
 
-impl fmt::Display for HardConflictReport {
+impl fmt::Display for ConflictReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.conflicts.is_empty() {
-            return f.write_str("no hard conflicts");
+            return f.write_str("no conflicts");
         }
 
         for (index, conflict) in self.conflicts.iter().enumerate() {
@@ -105,6 +105,8 @@ pub enum ConflictCode {
     ReplayFailure,
     /// Both replay orders succeeded but the final ASTs diverged.
     NonConvergentReplay,
+    /// One side renames a `let` binding while the other changes its initializer.
+    BindingRenameVsInitializerChange,
 }
 
 /// Relevant operation from one side of the conflict.
@@ -157,3 +159,6 @@ pub(crate) struct ReplayFailure {
     pub stage: ReplayStage,
     pub message: String,
 }
+
+/// Backward-compatible alias for the old hard-only report name.
+pub type HardConflictReport = ConflictReport;

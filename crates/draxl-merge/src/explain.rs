@@ -1,7 +1,7 @@
 use crate::model::{
     Conflict, ConflictClass, ConflictCode, ConflictSide, ReplayFailure, ReplayOrder, ReplayStage,
 };
-use crate::render::{path_label, ranked_dest_label, summarize_side};
+use crate::render::{node_label, path_label, ranked_dest_label, summarize_side};
 use draxl_patch::{PatchOp, RankedDest, SlotRef};
 
 pub(crate) fn same_node_write_conflict(
@@ -140,6 +140,38 @@ pub(crate) fn non_convergent_replay_conflict(left: &[PatchOp], right: &[PatchOp]
         right: right_sides,
         remediation: Some(
             "rewrite the overlapping patch ops so both replay orders converge to one result"
+                .to_owned(),
+        ),
+    }
+}
+
+pub(crate) fn binding_rename_vs_initializer_change_conflict(
+    left_index: usize,
+    left_op: &PatchOp,
+    right_index: usize,
+    right_op: &PatchOp,
+    let_id: &str,
+    binding_id: &str,
+) -> Conflict {
+    Conflict {
+        class: ConflictClass::Semantic,
+        code: ConflictCode::BindingRenameVsInitializerChange,
+        summary: format!(
+            "one side renames binding `{}` while the other changes initializer meaning in `{}`",
+            node_label(binding_id),
+            node_label(let_id)
+        ),
+        detail: format!(
+            "These edits are structurally mergeable, but they should be reviewed together. \
+             The left patch stream renames the binding `{}` in let statement `{}`, while the right patch stream changes the initializer subtree of the same let. \
+             That means the merged code may keep a name whose meaning has shifted.",
+            node_label(binding_id),
+            node_label(let_id)
+        ),
+        left: vec![summarize_side(left_index, left_op)],
+        right: vec![summarize_side(right_index, right_op)],
+        remediation: Some(
+            "review the binding name against the new initializer meaning and rename or rewrite them together"
                 .to_owned(),
         ),
     }

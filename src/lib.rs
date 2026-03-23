@@ -182,3 +182,12 @@ pub fn check_hard_conflicts(
 ) -> merge::HardConflictReport {
     merge::check_hard_conflicts(base, left, right)
 }
+
+/// Checks both hard and semantic conflicts against the same base.
+pub fn check_conflicts(
+    base: &ast::File,
+    left: &[patch::PatchOp],
+    right: &[patch::PatchOp],
+) -> merge::ConflictReport {
+    merge::check_conflicts(base, left, right)
+}
