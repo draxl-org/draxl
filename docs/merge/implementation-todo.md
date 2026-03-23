@@ -174,7 +174,7 @@ TODO:
 
 ### 6. Performance And Incremental Strategy
 
-This is not the first blocker, but it should be kept in view.
+This is a later concern, but it should stay in view.
 
 If semantic conflict checking grows, we may eventually want:
 

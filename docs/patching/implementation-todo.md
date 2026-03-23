@@ -7,7 +7,8 @@ the Rust API and CLI for the current modeled Rust profile.
 The remaining notes here are best read as follow-up cleanup and extension work,
 not as a statement that patch-text execution is still missing.
 
-The goal is not to bypass the existing structured patch model. The goal is:
+The goal is to keep the existing structured patch model as the execution
+backend while making the textual patch surface executable:
 
 ```text
 textual patch stream -> surface patch AST -> schema + AST resolution -> PatchOp -> executor

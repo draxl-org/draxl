@@ -44,8 +44,8 @@ In an agent-heavy workflow, that gap gets worse:
 - the combined result may carry misleading names, contracts, or assumptions
 - agents need explicit feedback about why a review is required
 
-The point of semantic conflict reporting is not to block every merge. The point
-is to surface merged results that are structurally valid but still suspicious.
+Semantic conflict reporting surfaces merged results that are structurally valid
+but still suspicious.
 
 ## Current Examples
 

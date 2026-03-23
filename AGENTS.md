@@ -25,6 +25,8 @@
 
 - Classify standalone lines like `That distinction matters.` as content-free emphasis, rhetorical filler, or throat-clearing, and remove them.
 - Do not write standalone meta-emphasis or signposting sentences that only assert importance, contrast, or relevance without adding a concrete claim.
+- Prefer affirmative definitions over negative ones. Do not introduce a concept with lines such as `X is not Y` or `The point is not to ...` when a direct positive statement would be clearer.
+- Use explicit negative framing only in sections that are actually about boundaries, such as `Non-goals`, `Limits`, or `Rejected approaches`.
 - Avoid filler lines such as `That distinction matters.`, `This matters.`, `This is important.`, or `This is the most important missing abstraction.`
 - If a sentence can be deleted without losing technical content, delete it or fold the concrete reason into a nearby sentence.
 - Prefer direct statements of mechanism or consequence.
