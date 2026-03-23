@@ -10,6 +10,10 @@ For the canonical textual notation used in docs, the Rust API, and the CLI, see
 [patch-op-syntax.md](patch-op-syntax.md). This document focuses on the semantic
 model and the current Rust API behavior.
 
+Textual patch streams may also include whole-line `//` comments between ops.
+Those comments are non-semantic notes for review or rationale and are discarded
+by resolution and execution.
+
 ## Core model
 
 The public patch surface splits into four families:

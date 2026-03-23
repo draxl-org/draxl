@@ -11,7 +11,9 @@ the CLI.
 ## Grammar
 
 ```text
-stream      := (blank_line* op blank_line*)*
+stream      := (layout* op layout*)*
+layout      := blank_line | comment_line
+comment_line:= ws* "//" text? newline
 op          := insert | put | replace | delete | move | set | clear | attach | detach
 
 insert      := "insert" ranked_dest ":" fragment
@@ -32,6 +34,10 @@ path        := node_ref ("." ident)+
 node_ref    := "@" ident
 value       := ident | string | int | "true" | "false"
 ```
+
+Whole-line `//` comments are non-semantic patch notes. They are
+ignored by parsing, resolution, and execution, so they are safe for human
+rationale inside a patch bundle.
 
 ## Addressing
 
@@ -84,7 +90,7 @@ Rules:
 - `replace` preserves the target node identity and outer placement
 - fragment parsing respects balanced parens, braces, and brackets across
   multiple lines
-- blank lines may separate patch ops in a stream
+- blank lines and whole-line `//` patch comments may separate patch ops in a stream
 
 ## Semantics
 
@@ -127,6 +133,12 @@ not arbitrary graph-edge edits.
 ## Examples
 
 ```text
+// Rename the API entrypoint before updating docs.
+set @f1.name = add_one_fast
+
+// Keep the doc node, but clear the stale text for a later rewrite.
+clear @d1.text
+
 replace @e2: (@e2 x * @l2 2)
 
 insert @f1.body[ah]: @s4 @e4 trace();
@@ -134,10 +146,6 @@ insert @f1.body[ah]: @s4 @e4 trace();
 put @f1.ret: @t9 i128
 
 move @s4 -> @f1.body[ai]
-
-set @f1.name = add_one_fast
-
-clear @d1.text
 
 attach @d2 -> @f1
 

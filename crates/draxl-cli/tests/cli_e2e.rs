@@ -98,6 +98,7 @@ fn patch_command_applies_textual_patch_ops() {
     let patch_path = write_temp_file(
         "patch_ops.dxpatch",
         r#"
+// rename the function through the semantic patch surface
 set @f1.name = renamed_first
 "#,
     );
@@ -124,6 +125,7 @@ fn patch_in_place_rewrites_the_file() {
     let patch_path = write_temp_file(
         "patch_in_place.dxpatch",
         r#"
+// same patch surface, but written back in place
 set @f1.name = renamed_first
 "#,
     );

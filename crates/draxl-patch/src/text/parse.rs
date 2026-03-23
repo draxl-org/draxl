@@ -26,10 +26,10 @@ impl<'a> PatchTextParser<'a> {
 
     fn parse_ops(&mut self) -> Result<Vec<SurfacePatchOp>, PatchTextError> {
         let mut ops = Vec::new();
-        self.skip_whitespace();
+        self.skip_layout();
         while !self.at_eof() {
             ops.push(self.parse_op()?);
-            self.skip_whitespace();
+            self.skip_layout();
         }
         Ok(ops)
     }
@@ -380,6 +380,7 @@ impl<'a> PatchTextParser<'a> {
                     let next_non_space = self.skip_horizontal_from(next);
                     if next_non_space >= self.bytes.len()
                         || self.bytes[next_non_space] == b'\n'
+                        || self.starts_with_patch_comment(next_non_space)
                         || self.starts_with_patch_keyword(next_non_space)
                     {
                         let end = trim_horizontal_end(self.source, start, index);
@@ -551,6 +552,19 @@ impl<'a> PatchTextParser<'a> {
         }
     }
 
+    fn skip_layout(&mut self) {
+        loop {
+            let start = self.index;
+            self.skip_whitespace();
+            if self.skip_patch_comment_line() {
+                continue;
+            }
+            if self.index == start {
+                break;
+            }
+        }
+    }
+
     fn skip_whitespace(&mut self) {
         while self
             .peek()
@@ -584,6 +598,25 @@ impl<'a> PatchTextParser<'a> {
             index += 1;
         }
         index
+    }
+
+    fn skip_patch_comment_line(&mut self) -> bool {
+        if self.starts_with_patch_comment(self.index) {
+            self.bump();
+            self.bump();
+        } else {
+            return false;
+        }
+
+        while self.peek().is_some_and(|byte| byte != b'\n') {
+            self.bump();
+        }
+
+        true
+    }
+
+    fn starts_with_patch_comment(&self, index: usize) -> bool {
+        self.bytes.get(index) == Some(&b'/') && self.bytes.get(index + 1) == Some(&b'/')
     }
 
     fn starts_with_patch_keyword(&self, index: usize) -> bool {

@@ -28,6 +28,31 @@ clear @d1.text
 }
 
 #[test]
+fn parse_patch_ops_accepts_whole_line_patch_comments() {
+    let patch = r#"
+// rename the function before touching the doc payload
+set @f1.name = add_two
+
+// keep the doc node, but clear its current text
+clear @d1.text
+"#;
+
+    let ops = draxl::parse_patch_ops(patch).expect("patch text should parse");
+    assert_eq!(ops.len(), 2);
+}
+
+#[test]
+fn parse_patch_ops_rejects_hash_patch_comments() {
+    let patch = r#"
+# rename the function before touching the doc payload
+set @f1.name = add_two
+"#;
+
+    let error = draxl::parse_patch_ops(patch).expect_err("hash comments should be rejected");
+    assert!(error.to_string().contains("expected identifier"));
+}
+
+#[test]
 fn resolve_patch_ops_can_target_ids_inserted_earlier_in_the_stream() {
     let source = read("examples/04_ranks.rs.dx");
     let file = draxl::parse_and_validate(&source).expect("example should parse");
@@ -66,6 +91,24 @@ clear @d1.text
     assert!(formatted.contains("@d1->f1 ///\n"));
     assert!(formatted.contains("fn renamed_first()"));
     assert!(formatted.contains("fn second()"));
+}
+
+#[test]
+fn apply_patch_text_accepts_comment_lines_after_fragment_ops() {
+    let source = read("examples/01_add.rs.dx");
+    let mut file = draxl::parse_and_validate(&source).expect("example should parse");
+    let patch = r#"
+replace @e3: @e3 y_plus_one
+// explain why this bundle also clears the stale summary for follow-up review
+clear @d1.text
+"#;
+
+    draxl::apply_patch_text(&mut file, patch).expect("patch should apply");
+    validate_file(&file).expect("patched file should validate");
+
+    let formatted = print_file(&file);
+    assert!(formatted.contains("@s2[b] @e3 y_plus_one"));
+    assert!(formatted.contains("@d1 ///\n"));
 }
 
 #[test]

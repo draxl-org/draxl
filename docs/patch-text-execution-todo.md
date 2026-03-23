@@ -342,7 +342,7 @@ semantics.
   `draxl-parser`?
 - Should the surface parser own tokenization, or should a reusable token layer
   be extracted?
-- Should a patch stream accept comments?
+- Patch streams accept whole-line `//` comments as non-semantic notes.
 - Should the CLI support stdin patch streams in v1, or only patch files?
 - Should we expose unresolved surface ops publicly, or keep them crate-private
   and expose only resolved `PatchOp` values?
