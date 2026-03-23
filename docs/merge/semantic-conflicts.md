@@ -54,6 +54,10 @@ The current semantic conflict rules are covered by:
 
 ### Binding Name Vs Initializer Meaning
 
+This example shows one branch changing a binding name to communicate a unit
+while the other branch changes the bound value to a different unit. The merge
+stays structurally clean, but the name and initializer no longer agree.
+
 Starting Draxl source:
 
 ```text
