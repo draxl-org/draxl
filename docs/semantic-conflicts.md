@@ -47,11 +47,13 @@ In an agent-heavy workflow, that gap gets worse:
 The point of semantic conflict reporting is not to block every merge. The point
 is to surface merged results that are structurally valid but still suspicious.
 
-## Current Example
+## Current Examples
 
-The first implemented semantic conflict rule is covered by:
+The current semantic conflict rules are covered by:
 
 - [crates/draxl-merge/tests/semantic_conflicts.rs](../crates/draxl-merge/tests/semantic_conflicts.rs)
+
+### Binding Name Vs Initializer Meaning
 
 Starting Draxl source:
 
@@ -104,31 +106,83 @@ the other side changes another projection of the same object
 the combined result remains structurally valid but loses semantic coherence
 ```
 
+### Parameter Contract Vs Body Interpretation
+
+Starting Draxl source:
+
+```text
+@m1 mod demo {
+  @f1[a] fn is_discount_allowed(@p1[a] rate: @t1 Percent) -> @t2 bool {
+    @s1[a] @e1 (@e2 rate < @l1 100)
+  }
+}
+```
+
+Left patch stream:
+
+```text
+put @p1.ty: @t3 BasisPoints
+```
+
+Right patch stream:
+
+```text
+replace @e1: @e1 (@e2 rate < @l1 95)
+```
+
+Those edits are also structurally mergeable. There is no hard conflict.
+
+But they are still review-worthy together:
+
+- the left side changes the parameter contract from `Percent` to `BasisPoints`
+- the right side changes body logic that still interprets the same parameter
+  on the old scale
+
+That yields a merged result with a mismatched contract and body:
+
+```text
+@m1 mod demo {
+  @f1[a] fn is_discount_allowed(@p1[a] rate: @t3 BasisPoints) -> @t2 bool {
+    @s1[a] @e1 (@e2 rate < @l1 95)
+  }
+}
+```
+
+In the current bootstrap subset this uses a threshold comparison instead of
+`/ 100` arithmetic, but the semantic shape is the same:
+
+```text
+one side changes the parameter contract
+the other side changes body logic that still interprets that parameter
+the merged result remains compiler-clean but loses semantic coherence
+```
+
 ## Relation To The Git Reproduction
 
 The text-side motivation for this work is captured by:
 
 - [tests/git_merge.rs](../tests/git_merge.rs)
 
-That test shows a plain Git merge succeeding without conflict even though the
-merged result combines two semantically coupled edits. The Draxl semantic
-conflict rule exists to make that class of issue visible at the structural
-patch level.
+Those tests show plain Git merges succeeding without conflict even though the
+merged results combine semantically coupled edits. The Draxl semantic conflict
+rules exist to make that class of issue visible at the structural patch level.
 
 ## Current Scope
 
-Today the implemented semantic rule is intentionally narrow:
+Today the implemented semantic rules are intentionally narrow:
 
 - a `let` binding rename on one side
 - an initializer-region change for the same `let` on the other side
+- a parameter type contract change on one side
+- body logic changes for the same function that still interpret that parameter
 
-This rule is a small starting point, not the final design.
+These rules are a small starting point, not the final design.
 
 Future semantic rules will likely cover cases such as:
 
 - signature change versus body change
 - operator change versus operand edits
-- parameter rename versus type or contract changes
+- effect or annotation change versus implementation behavior
 
 ## Design Direction
 
