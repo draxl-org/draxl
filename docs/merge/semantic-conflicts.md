@@ -151,6 +151,11 @@ the combined result remains structurally valid but loses semantic coherence
 
 ### Parameter Contract Vs Body Interpretation
 
+This example shows one branch changing the declared contract of a parameter
+while the other branch changes body logic that still interprets that parameter
+through the old contract. The merge stays structurally clean, but the contract
+and the body no longer agree.
+
 Owner and regions in this example:
 
 - owner: parameter `@p1` within function `@f1`
