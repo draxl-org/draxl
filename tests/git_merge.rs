@@ -63,71 +63,39 @@ const EXPECTED_MERGED_SOURCE: &str = r#"fn price(amount: Cents) -> Cents {
 }
 "#;
 
-const CALL_BASE_SOURCE: &str = r#"fn charge(_amount: u64) {}
-fn charge_dollars(_amount: u64) {}
-fn to_cents(amount: u64) -> u64 { amount * 100 }
-fn normalize(amount: u64) -> u64 { amount }
-fn audit() {}
+const PARAM_BASE_SOURCE: &str = r#"type Percent = u64;
+type BasisPoints = u64;
 
-fn checkout(amount: u64) {
-    charge(
-        normalize(
-            amount
-        )
-    );
-
-    audit();
+fn is_discount_allowed(rate: Percent) -> bool {
+    rate
+        < 100
 }
 "#;
 
-const CALL_CALLEE_SOURCE: &str = r#"fn charge(_amount: u64) {}
-fn charge_dollars(_amount: u64) {}
-fn to_cents(amount: u64) -> u64 { amount * 100 }
-fn normalize(amount: u64) -> u64 { amount }
-fn audit() {}
+const PARAM_CONTRACT_SOURCE: &str = r#"type Percent = u64;
+type BasisPoints = u64;
 
-fn checkout(amount: u64) {
-    charge_dollars(
-        normalize(
-            amount
-        )
-    );
-
-    audit();
+fn is_discount_allowed(rate: BasisPoints) -> bool {
+    rate
+        < 100
 }
 "#;
 
-const CALL_ARGUMENT_SOURCE: &str = r#"fn charge(_amount: u64) {}
-fn charge_dollars(_amount: u64) {}
-fn to_cents(amount: u64) -> u64 { amount * 100 }
-fn normalize(amount: u64) -> u64 { amount }
-fn audit() {}
+const PARAM_BODY_SOURCE: &str = r#"type Percent = u64;
+type BasisPoints = u64;
 
-fn checkout(amount: u64) {
-    charge(
-        normalize(
-            to_cents(amount)
-        )
-    );
-
-    audit();
+fn is_discount_allowed(rate: Percent) -> bool {
+    rate
+        < 95
 }
 "#;
 
-const EXPECTED_CALL_MERGED_SOURCE: &str = r#"fn charge(_amount: u64) {}
-fn charge_dollars(_amount: u64) {}
-fn to_cents(amount: u64) -> u64 { amount * 100 }
-fn normalize(amount: u64) -> u64 { amount }
-fn audit() {}
+const EXPECTED_PARAM_MERGED_SOURCE: &str = r#"type Percent = u64;
+type BasisPoints = u64;
 
-fn checkout(amount: u64) {
-    charge_dollars(
-        normalize(
-            to_cents(amount)
-        )
-    );
-
-    audit();
+fn is_discount_allowed(rate: BasisPoints) -> bool {
+    rate
+        < 95
 }
 "#;
 
@@ -200,11 +168,11 @@ fn git_merges_semantic_conflict_without_reporting_a_text_conflict() {
 }
 
 #[test]
-fn git_merges_call_contract_semantic_conflict_without_reporting_a_text_conflict() {
+fn git_merges_parameter_contract_semantic_conflict_without_reporting_a_text_conflict() {
     let repo = TempGitRepo::new();
-    repo.write_file("checkout.rs", CALL_BASE_SOURCE);
+    repo.write_file("discount.rs", PARAM_BASE_SOURCE);
     repo.git_ok(&["init", "-q"]);
-    repo.git_ok(&["add", "checkout.rs"]);
+    repo.git_ok(&["add", "discount.rs"]);
     repo.git_ok(&[
         "-c",
         "user.name=Codex",
@@ -219,9 +187,9 @@ fn git_merges_call_contract_semantic_conflict_without_reporting_a_text_conflict(
     let base_branch = repo.git_stdout(&["branch", "--show-current"]);
     let base_branch = base_branch.trim();
 
-    repo.git_ok(&["checkout", "-q", "-b", "callee-branch"]);
-    repo.write_file("checkout.rs", CALL_CALLEE_SOURCE);
-    repo.git_ok(&["add", "checkout.rs"]);
+    repo.git_ok(&["checkout", "-q", "-b", "contract-branch"]);
+    repo.write_file("discount.rs", PARAM_CONTRACT_SOURCE);
+    repo.git_ok(&["add", "discount.rs"]);
     repo.git_ok(&[
         "-c",
         "user.name=Codex",
@@ -230,13 +198,13 @@ fn git_merges_call_contract_semantic_conflict_without_reporting_a_text_conflict(
         "commit",
         "-q",
         "-m",
-        "change callee contract",
+        "change parameter contract",
     ]);
 
     repo.git_ok(&["checkout", "-q", base_branch]);
-    repo.git_ok(&["checkout", "-q", "-b", "argument-branch"]);
-    repo.write_file("checkout.rs", CALL_ARGUMENT_SOURCE);
-    repo.git_ok(&["add", "checkout.rs"]);
+    repo.git_ok(&["checkout", "-q", "-b", "body-branch"]);
+    repo.write_file("discount.rs", PARAM_BODY_SOURCE);
+    repo.git_ok(&["add", "discount.rs"]);
     repo.git_ok(&[
         "-c",
         "user.name=Codex",
@@ -245,10 +213,10 @@ fn git_merges_call_contract_semantic_conflict_without_reporting_a_text_conflict(
         "commit",
         "-q",
         "-m",
-        "change argument representation",
+        "change body threshold",
     ]);
 
-    let merge = repo.git(&["merge", "callee-branch"]);
+    let merge = repo.git(&["merge", "contract-branch"]);
     assert!(
         merge.status.success(),
         "expected merge success\nstdout:\n{}\nstderr:\n{}",
@@ -256,8 +224,8 @@ fn git_merges_call_contract_semantic_conflict_without_reporting_a_text_conflict(
         String::from_utf8_lossy(&merge.stderr)
     );
 
-    let merged = repo.read_file("checkout.rs");
-    assert_eq!(merged, EXPECTED_CALL_MERGED_SOURCE);
+    let merged = repo.read_file("discount.rs");
+    assert_eq!(merged, EXPECTED_PARAM_MERGED_SOURCE);
     assert!(
         !merged.contains("<<<<<<<"),
         "merged file unexpectedly contains conflict markers:\n{merged}"

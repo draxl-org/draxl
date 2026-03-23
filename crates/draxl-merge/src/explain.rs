@@ -177,30 +177,33 @@ pub(crate) fn binding_rename_vs_initializer_change_conflict(
     }
 }
 
-pub(crate) fn call_callee_vs_argument_change_conflict(
+pub(crate) fn parameter_type_vs_body_interpretation_change_conflict(
     left_index: usize,
     left_op: &PatchOp,
     right_index: usize,
     right_op: &PatchOp,
-    call_id: &str,
+    fn_id: &str,
+    param_id: &str,
 ) -> Conflict {
     Conflict {
         class: ConflictClass::Semantic,
-        code: ConflictCode::CallCalleeVsArgumentChange,
+        code: ConflictCode::ParameterTypeVsBodyInterpretationChange,
         summary: format!(
-            "one side changes the callee while the other changes argument meaning in `{}`",
-            node_label(call_id)
+            "one side changes parameter contract `{}` while the other changes body interpretation in `{}`",
+            node_label(param_id),
+            node_label(fn_id)
         ),
         detail: format!(
             "These edits are structurally mergeable, but they should be reviewed together. \
-             The left patch stream changes the callee region of call `{}`, while the right patch stream changes an argument region of the same call. \
-             That means the merged code may pair a new call contract with an argument value that still follows the old representation.",
-            node_label(call_id)
+             The left patch stream changes the type contract for parameter `{}` in function `{}`, while the right patch stream changes body logic that still interprets that parameter. \
+             That means the merged code may keep body behavior that no longer matches the parameter contract.",
+            node_label(param_id),
+            node_label(fn_id)
         ),
         left: vec![summarize_side(left_index, left_op)],
         right: vec![summarize_side(right_index, right_op)],
         remediation: Some(
-            "review the call contract against the merged argument representation and update them together"
+            "review the parameter contract against the merged body logic and update them together"
                 .to_owned(),
         ),
     }

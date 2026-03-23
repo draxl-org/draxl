@@ -1,5 +1,5 @@
 use draxl_merge::{check_conflicts, check_hard_conflicts, ConflictClass, ConflictCode};
-use draxl_parser::parse_expr_fragment;
+use draxl_parser::{parse_expr_fragment, parse_type_fragment};
 use draxl_patch::{PatchNode, PatchOp, PatchPath, PatchValue, SlotOwner, SlotRef};
 use draxl_validate::validate_file;
 
@@ -94,31 +94,30 @@ fn ranked_insert_example_stays_clean_under_full_conflict_check() {
 }
 
 #[test]
-fn reports_call_callee_vs_argument_change_as_semantic_conflict() {
+fn reports_parameter_type_vs_body_interpretation_change_as_semantic_conflict() {
     let source = r#"
 @m1 mod demo {
-  @f1[a] fn checkout(@p1[a] amount: @t1 u64) {
-    @s1[a] @e1 charge(@e2 amount);
-    @s2[b] @e3 audit();
+  @f1[a] fn is_discount_allowed(@p1[a] rate: @t1 Percent) -> @t2 bool {
+    @s1[a] @e1 (@e2 rate < @l1 100)
   }
 }
 "#;
     let file = parse_source(source);
     let left = vec![PatchOp::Put {
         slot: SlotRef {
-            owner: SlotOwner::Node("e1".to_owned()),
-            slot: "callee".to_owned(),
+            owner: SlotOwner::Node("p1".to_owned()),
+            slot: "ty".to_owned(),
         },
-        node: PatchNode::Expr(
-            parse_expr_fragment("@e4 charge_dollars")
-                .expect("callee replacement fragment should parse"),
+        node: PatchNode::Type(
+            parse_type_fragment("@t3 BasisPoints")
+                .expect("parameter type replacement fragment should parse"),
         ),
     }];
     let right = vec![PatchOp::Replace {
-        target_id: "e2".to_owned(),
+        target_id: "e1".to_owned(),
         replacement: PatchNode::Expr(
-            parse_expr_fragment("@e2 to_cents(@e5 amount)")
-                .expect("argument replacement fragment should parse"),
+            parse_expr_fragment("@e1 (@e2 rate < @l1 95)")
+                .expect("body replacement fragment should parse"),
         ),
     }];
 
@@ -134,10 +133,11 @@ fn reports_call_callee_vs_argument_change_as_semantic_conflict() {
     assert_eq!(report.conflicts[0].class, ConflictClass::Semantic);
     assert_eq!(
         report.conflicts[0].code,
-        ConflictCode::CallCalleeVsArgumentChange
+        ConflictCode::ParameterTypeVsBodyInterpretationChange
     );
-    assert!(report.conflicts[0].summary.contains("@e1"));
-    assert!(report.conflicts[0].detail.contains("new call contract"));
+    assert!(report.conflicts[0].summary.contains("@p1"));
+    assert!(report.conflicts[0].summary.contains("@f1"));
+    assert!(report.conflicts[0].detail.contains("parameter contract"));
     assert_eq!(report.conflicts[0].left.len(), 1);
     assert_eq!(report.conflicts[0].right.len(), 1);
 }

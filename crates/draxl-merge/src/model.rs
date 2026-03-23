@@ -107,8 +107,8 @@ pub enum ConflictCode {
     NonConvergentReplay,
     /// One side renames a `let` binding while the other changes its initializer.
     BindingRenameVsInitializerChange,
-    /// One side changes a call callee while the other changes its arguments.
-    CallCalleeVsArgumentChange,
+    /// One side changes a parameter contract while the other changes body interpretation.
+    ParameterTypeVsBodyInterpretationChange,
 }
 
 /// Relevant operation from one side of the conflict.
