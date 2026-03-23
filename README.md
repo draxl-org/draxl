@@ -135,8 +135,9 @@ ranked slots instead of guessing intent from lines and spans.
 | Branches and forks     | repeated rebase repair    | semantic replay by identity  |
 | Merge conflicts        | overlapping text          | overlapping semantic regions |
 
-Draxl distinguishes between hard conflicts and semantic conflicts. For the
-current terminology and examples, see
+Draxl distinguishes between hard conflicts, validation/build failures, and
+semantic conflicts. For the layering model and current terminology, see
+[docs/conflicts.md](docs/conflicts.md) and
 [docs/semantic-conflicts.md](docs/semantic-conflicts.md).
 
 ## Semantic patching

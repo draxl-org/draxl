@@ -1,5 +1,7 @@
 # Semantic Conflicts
 
+This document describes layer 3 from [conflicts.md](conflicts.md).
+
 Draxl uses two different conflict classes during merge analysis:
 
 - **hard conflicts** stop deterministic auto-merge
