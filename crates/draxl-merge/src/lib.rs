@@ -9,6 +9,7 @@ mod detect;
 mod explain;
 mod model;
 mod render;
+mod semantic;
 
 pub use detect::{check_conflicts, check_hard_conflicts};
 pub use model::{

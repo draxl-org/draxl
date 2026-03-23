@@ -8,6 +8,8 @@ Current state:
 - hard conflicts have a dedicated crate: `crates/draxl-merge`
 - hard conflicts already return structured explanations
 - semantic conflicts exist, but only for a narrow starting set of rules
+- local semantic conflicts now use semantic owners and semantic regions derived
+  from the base AST on the fly
 
 The missing work is not one big feature. It is a set of smaller foundations
 that semantic conflict rules will need.
@@ -81,8 +83,8 @@ TODO:
 
 Open question:
 
-- is a parent/owner index enough, or do we also want explicit semantic-region
-  summaries such as "this is the meaning-defining region for binding `@p2`"?
+- how far can the owner-and-region model stretch before wider semantic
+  relations need a second abstraction?
 
 ### 2. Binding Awareness
 

@@ -33,6 +33,25 @@ Typical semantic objects include:
   body
 - an expression, with regions such as its operator, callee, and operands
 
+## Semantic Owners And Regions
+
+The current `draxl-merge` implementation derives local semantic conflicts from
+two internal ideas:
+
+- a **semantic owner**, which is the smallest semantic object that contains the
+  relevant edits
+- a **semantic region**, which is the meaning-bearing part of that owner that a
+  patch op touches
+
+For the rules implemented today:
+
+- a binding owner uses regions such as binding name and binding initializer
+- a parameter owner uses regions such as parameter type contract and body
+  interpretation
+
+This owner-and-region view is derived from the base AST on the fly. Draxl does
+not persist merge-only semantic metadata in source syntax for these local cases.
+
 ## Why they matter
 
 Text-based merges often miss meaning-level overlaps. In an agent-heavy
@@ -57,6 +76,11 @@ The current semantic conflict rules are covered by:
 This example shows one branch changing a binding name to communicate a unit
 while the other branch changes the bound value to a different unit. The merge
 stays structurally clean, but the name and initializer no longer agree.
+
+Owner and regions in this example:
+
+- owner: the binding introduced by `@p2` in `@s1`
+- regions: binding name and binding initializer
 
 Starting Draxl source:
 
@@ -110,6 +134,11 @@ the combined result remains structurally valid but loses semantic coherence
 ```
 
 ### Parameter Contract Vs Body Interpretation
+
+Owner and regions in this example:
+
+- owner: parameter `@p1` within function `@f1`
+- regions: parameter type contract and body interpretation
 
 Starting Draxl source:
 
@@ -179,7 +208,8 @@ Today the implemented semantic rules are intentionally narrow:
 - a parameter type contract change on one side
 - body logic changes for the same function that still interpret that parameter
 
-These rules are the initial implemented slice of the broader design.
+These rules are the initial implemented slice of the broader owner-and-region
+design.
 
 Future semantic rules will likely cover cases such as:
 

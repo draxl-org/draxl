@@ -4,6 +4,8 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Default)]
 pub(crate) struct TreeContext {
     nodes: HashMap<String, NodeContext>,
+    let_bindings: HashMap<String, String>,
+    params_by_fn: HashMap<String, Vec<ParamSummary>>,
 }
 
 impl TreeContext {
@@ -29,6 +31,17 @@ impl TreeContext {
     pub(crate) fn node(&self, node_id: &str) -> Option<&NodeContext> {
         self.nodes.get(node_id)
     }
+
+    pub(crate) fn binding_id_for_let(&self, let_id: &str) -> Option<&str> {
+        self.let_bindings.get(let_id).map(String::as_str)
+    }
+
+    pub(crate) fn params_in_fn(&self, fn_id: &str) -> &[ParamSummary] {
+        self.params_by_fn
+            .get(fn_id)
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -44,6 +57,12 @@ pub(crate) struct NodeContext {
     pub let_region: Option<LetRegion>,
     pub is_let_binding: bool,
     pub is_let_stmt: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ParamSummary {
+    pub id: String,
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -114,7 +133,16 @@ fn visit_item(
         }
         Item::Enum(_) | Item::Use(_) | Item::Doc(_) | Item::Comment(_) => {}
         Item::Fn(node) => {
+            context.params_by_fn.entry(item_id.to_owned()).or_default();
             for param in &node.params {
+                context
+                    .params_by_fn
+                    .entry(item_id.to_owned())
+                    .or_default()
+                    .push(ParamSummary {
+                        id: param.meta.id.clone(),
+                        name: param.name.clone(),
+                    });
                 register_node(
                     context,
                     &param.meta.id,
@@ -377,6 +405,14 @@ fn visit_pattern(
     match pattern {
         Pattern::Ident(node) => {
             if let Some(meta) = &node.meta {
+                if is_let_binding {
+                    if let Some(let_id) = enclosing_let {
+                        context
+                            .let_bindings
+                            .entry(let_id.to_owned())
+                            .or_insert_with(|| meta.id.clone());
+                    }
+                }
                 register_node(
                     context,
                     &meta.id,

@@ -163,7 +163,7 @@ pub(crate) fn binding_rename_vs_initializer_change_conflict(
         ),
         detail: format!(
             "These edits are structurally mergeable, but they should be reviewed together. \
-             The left patch stream renames the binding `{}` in let statement `{}`, while the right patch stream changes the initializer subtree of the same let. \
+             One patch stream renames the binding `{}` in let statement `{}`, while the other changes the initializer subtree of the same let. \
              That means the merged code may keep a name whose meaning has shifted.",
             node_label(binding_id),
             node_label(let_id)
@@ -195,7 +195,7 @@ pub(crate) fn parameter_type_vs_body_interpretation_change_conflict(
         ),
         detail: format!(
             "These edits are structurally mergeable, but they should be reviewed together. \
-             The left patch stream changes the type contract for parameter `{}` in function `{}`, while the right patch stream changes body logic that still interprets that parameter. \
+             One patch stream changes the type contract for parameter `{}` in function `{}`, while the other changes body logic that still interprets that parameter. \
              That means the merged code may keep body behavior that no longer matches the parameter contract.",
             node_label(param_id),
             node_label(fn_id)
