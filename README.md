@@ -303,7 +303,8 @@ The current workspace is intentionally split by responsibility:
 - `draxl-parser`: lexer and parser for the Draxl surface syntax
 - `draxl-validate`: structural validation for ids, ranks, and anchors
 - `draxl-printer`: canonicalization and source printing
-- `draxl-lower-rust`: lowering from validated Draxl to ordinary Rust
+- `draxl-rust`: Rust-profile support, currently centered on lowering validated
+  Draxl to ordinary Rust
 - `draxl-patch`: structured patch operators over ids, profile-defined slots,
   attachments, and scalar paths
 - `draxl-merge`: merge analysis over patch streams, including hard conflicts
@@ -314,7 +315,7 @@ The current workspace is intentionally split by responsibility:
 source text
   -> draxl-parser
   -> draxl-validate
-  -> draxl-printer / draxl-lower-rust / draxl-patch
+  -> draxl-printer / draxl-rust / draxl-patch
   -> draxl facade and draxl CLI
 ```
 

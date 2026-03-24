@@ -7,7 +7,8 @@ Current state:
 
 - Draxl can parse `.rs.dx`, validate it, patch it, and lower it back to
   ordinary Rust
-- the workspace already has `draxl-lower-rust` for validated Draxl to Rust
+- the workspace already has `draxl-rust` for Rust-profile support, currently
+  covering validated Draxl to Rust lowering
 - the public repo does not yet have a supported path from ordinary Rust source
   into Draxl source with stable ids and ranks
 
@@ -183,18 +184,19 @@ TODO:
 
 ## Likely Shape
 
-The cleanest long-term shape is probably a new crate, separate from
-`draxl-lower-rust`.
+The cleanest long-term shape is probably to grow `draxl-rust` into the Rust
+profile crate rather than splitting Rust support by phase.
 
 Working default:
 
-- `draxl-import-rust` or similarly named crate
+- extend `draxl-rust`
 - parse ordinary Rust source
 - map into `draxl-ast::File`
 - validate
 - print canonical `.rs.dx`
 
-The root `draxl` facade and CLI can expose it after the mapping is stable.
+The root `draxl` facade and CLI can expose that importer after the mapping is
+stable.
 
 ## Suggested Work Order
 

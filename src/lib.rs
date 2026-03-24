@@ -25,11 +25,12 @@ use std::error::Error as StdError;
 use std::fmt;
 
 pub use draxl_ast as ast;
-pub use draxl_lower_rust as lower_rust;
 pub use draxl_merge as merge;
 pub use draxl_parser as parser;
 pub use draxl_patch as patch;
 pub use draxl_printer as printer;
+pub use draxl_rust as rust;
+pub use draxl_rust as lower_rust;
 pub use draxl_validate as validate;
 
 /// Convenience result type for `draxl` workflows.

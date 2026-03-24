@@ -1,13 +1,13 @@
 [package]
-name = "draxl-lower-rust"
+name = "draxl-rust"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "Lower validated Draxl Rust-profile files to ordinary Rust"
-documentation = "https://docs.rs/draxl-lower-rust"
+description = "Rust-profile support for Draxl"
+documentation = "https://docs.rs/draxl-rust"
 keywords = ["compiler", "lowering", "rust", "syntax", "ai"]
 categories = ["compilers", "development-tools"]
 

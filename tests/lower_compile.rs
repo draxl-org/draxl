@@ -1,6 +1,6 @@
 mod support;
 
-use draxl_lower_rust::lower_file;
+use draxl_rust::lower_file;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;

@@ -1,6 +1,6 @@
 mod support;
 
-use draxl_lower_rust::lower_file;
+use draxl_rust::lower_file;
 use support::{examples, parse_and_validate, read};
 
 #[test]

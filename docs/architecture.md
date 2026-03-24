@@ -27,7 +27,7 @@ source .rs.dx -->| draxl-parser   |
                   |      |      |
                   v      v      v
           +-----------+  +--------------+  +------------+
-          | printer   |  | lower-rust   |  | patch ops  |
+          | printer   |  | draxl-rust   |  | patch ops  |
           +-----------+  +--------------+  +------------+
                   \         |                 /
                    \        |                /
@@ -101,10 +101,11 @@ The printer has two jobs:
 Stable formatting is one of the core repository claims, so canonicalization and
 rendering stay separate.
 
-### `draxl-lower-rust`
+### `draxl-rust`
 
-This crate lowers validated Draxl into ordinary Rust source for the currently
-supported subset. It strips Draxl metadata while preserving the semantic shape
+This crate owns Rust-profile support. Today that surface is primarily lowering:
+it lowers validated Draxl into ordinary Rust source for the currently supported
+subset and strips Draxl metadata while preserving the semantic shape
 represented by the AST.
 
 ### `draxl-patch`

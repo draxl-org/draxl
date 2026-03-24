@@ -7,11 +7,11 @@ name = "draxl"
 version = "0.1.0"
 dependencies = [
  "draxl-ast",
- "draxl-lower-rust",
  "draxl-merge",
  "draxl-parser",
  "draxl-patch",
  "draxl-printer",
+ "draxl-rust",
  "draxl-validate",
 ]
 
@@ -24,14 +24,6 @@ name = "draxl-cli"
 version = "0.1.0"
 dependencies = [
  "draxl",
-]
-
-[[package]]
-name = "draxl-lower-rust"
-version = "0.1.0"
-dependencies = [
- "draxl-ast",
- "draxl-printer",
 ]
 
 [[package]]
@@ -67,6 +59,14 @@ name = "draxl-printer"
 version = "0.1.0"
 dependencies = [
  "draxl-ast",
+]
+
+[[package]]
+name = "draxl-rust"
+version = "0.1.0"
+dependencies = [
+ "draxl-ast",
+ "draxl-printer",
 ]
 
 [[package]]

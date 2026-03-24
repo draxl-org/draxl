@@ -19,7 +19,7 @@ members = [
     "crates/draxl-parser",
     "crates/draxl-printer",
     "crates/draxl-validate",
-    "crates/draxl-lower-rust",
+    "crates/draxl-rust",
     "crates/draxl-patch",
     "crates/draxl-merge",
     "crates/draxl-cli",
@@ -39,7 +39,7 @@ draxl-ast = { version = "0.1.0", path = "crates/draxl-ast" }
 draxl-parser = { version = "0.1.0", path = "crates/draxl-parser" }
 draxl-printer = { version = "0.1.0", path = "crates/draxl-printer" }
 draxl-validate = { version = "0.1.0", path = "crates/draxl-validate" }
-draxl-lower-rust = { version = "0.1.0", path = "crates/draxl-lower-rust" }
+draxl-rust = { version = "0.1.0", path = "crates/draxl-rust" }
 draxl-patch = { version = "0.1.0", path = "crates/draxl-patch" }
 draxl-merge = { version = "0.1.0", path = "crates/draxl-merge" }
 serde = { version = "1", features = ["derive"] }
@@ -50,6 +50,6 @@ draxl-ast.workspace = true
 draxl-parser.workspace = true
 draxl-printer.workspace = true
 draxl-validate.workspace = true
-draxl-lower-rust.workspace = true
+draxl-rust.workspace = true
 draxl-patch.workspace = true
 draxl-merge.workspace = true
