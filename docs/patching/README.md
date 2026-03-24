@@ -27,7 +27,7 @@ The textual patch surface is executable today through the Rust API and
   implementation boundary
 - [bundles.md](bundles.md): patch streams as logical bundles, `//` rationale
   comments, and how patch bundles relate to Git commits
-- [implementation-todo.md](implementation-todo.md): implementation notes and
+- [../todo/patching.md](../todo/patching.md): implementation notes and
   follow-up engineering work for the patch frontend
 
 ## Core Terms

@@ -10,7 +10,7 @@ Start here:
   capability boundary
 - [patching/bundles.md](patching/bundles.md): patch streams, `//` rationale
   comments, and commit-level conventions
-- [patching/implementation-todo.md](patching/implementation-todo.md):
-  implementation notes and follow-up work
+- [todo/patching.md](todo/patching.md): implementation notes and follow-up
+  work
 
 This top-level page remains as a compatibility stub for older links.

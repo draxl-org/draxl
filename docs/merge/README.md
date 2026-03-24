@@ -24,8 +24,8 @@ coherence as separate questions instead of collapsing them into one generic
   validation or CI sits in the flow
 - [semantic-conflicts.md](semantic-conflicts.md): current semantic-conflict
   rules, examples, and design direction
-- [implementation-todo.md](implementation-todo.md): implementation notes and
-  follow-up engineering work for merge analysis
+- [../todo/merge-conflicts.md](../todo/merge-conflicts.md): implementation
+  notes and follow-up engineering work for merge analysis
 
 ## Core Terms
 
