@@ -4,11 +4,11 @@ use draxl_ast::{
     BinaryOp, Block, Expr, ExprBinary, ExprCall, ExprLit, ExprPath, Item, ItemFn, Literal, Meta,
     Param, Path, Stmt, StmtExpr, Type, TypePath,
 };
-use draxl_rust::lower_file;
 use draxl_patch::{
     apply_op, PatchDest, PatchNode, PatchOp, PatchPath, PatchValue, RankedDest, SlotOwner, SlotRef,
 };
 use draxl_printer::print_file;
+use draxl_rust::lower_file;
 use draxl_validate::validate_file;
 
 #[test]
