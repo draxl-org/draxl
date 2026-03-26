@@ -31,11 +31,13 @@ The first Python profile should target `.py.dx` files with this modeled subset.
 
 - top-level function definitions
 - line comments
-- ordered top-level items with explicit ranks
+- no top-level executable statements
 
 The first version should defer imports, classes, and decorators. Imports are
 valuable, but the current shared `use` model is Rust-specific, so import syntax
-belongs after the first cross-language refactor.
+belongs after the first cross-language refactor. Keeping top-level executable
+statements out of scope also keeps the bootstrap profile centered on
+function-oriented modules rather than full Python module semantics.
 
 ### Function definitions
 
@@ -55,7 +57,8 @@ The first version should defer:
 
 ### Statements
 
-- assignment statements of the form `name = expr`
+- single-target assignment statements of the form `name = expr`
+- `return`
 - `return expr`
 - bare expression statements
 - attached line comments
@@ -70,6 +73,9 @@ The first version should defer:
 - `with`
 - `raise`
 - `pass`
+- `global`
+- `nonlocal`
+- chained assignment
 - destructuring assignment
 - augmented assignment
 
@@ -82,13 +88,15 @@ empty bodies cleanly would require a modeled `pass` statement.
 - integer literals
 - string literals
 - grouped expressions
-- call expressions
+- call expressions with positional arguments only
 - attribute access such as `obj.attr`
 - binary expressions with `+`, `-`, and `<`
 - unary minus
 
 The first version should defer:
 
+- keyword arguments
+- starred and double-starred argument unpacking
 - boolean operators
 - `==`, `!=`, `<=`, `>`, `>=`
 - list, tuple, dict, and set literals
@@ -117,6 +125,27 @@ Default direction for the bootstrap profile:
   profile boundary end to end
 - prefer profile-specific parsing and lowering over stretching Rust-specific
   surface rules further
+
+## Open Questions
+
+These points are still worth leaving open until implementation pressure makes
+the tradeoff concrete.
+
+### 1. `.py.dx` Surface Shape
+
+Open question:
+
+- should `.py.dx` use indentation-sensitive blocks, or should the bootstrap
+  profile use a more explicit block marker while the multi-profile surface is
+  still in flux?
+
+### 2. File-Root Ordering
+
+Open question:
+
+- should file-root items eventually require ranks the same way module items,
+  parameters, and statements do, or is plain file order enough for the
+  bootstrap profile?
 
 ## First Shared-IR Pressure
 
