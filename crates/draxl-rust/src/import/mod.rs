@@ -1,4 +1,4 @@
-//! Importing ordinary Rust source into canonical Draxl Rust-profile source.
+//! Importing ordinary Rust source into the Draxl AST.
 
 use draxl_ast as ast;
 use std::collections::BTreeMap;
@@ -6,14 +6,10 @@ use std::error::Error as StdError;
 use std::fmt;
 use syn::spanned::Spanned;
 
-/// Imports ordinary Rust source into canonical Draxl source.
-pub fn import_source(source: &str) -> Result<String, ImportError> {
+/// Imports ordinary Rust source into the Draxl AST.
+pub fn import_source(source: &str) -> Result<ast::File, ImportError> {
     let parsed = syn::parse_file(source).map_err(ImportError::RustParse)?;
-    let file = Importer::default().import_file(&parsed)?;
-    let printed = draxl_printer::print_file(&file);
-    let reparsed = draxl_parser::parse_file(&printed).map_err(ImportError::DraxlParse)?;
-    draxl_validate::validate_file(&reparsed).map_err(ImportError::Validation)?;
-    Ok(draxl_printer::print_file(&reparsed))
+    Importer::default().import_file(&parsed)
 }
 
 /// Import failure while converting ordinary Rust into Draxl.
@@ -23,20 +19,6 @@ pub enum ImportError {
     RustParse(syn::Error),
     /// The Rust source used syntax outside the currently supported import subset.
     Unsupported(syn::Error),
-    /// The imported Draxl output did not parse back through the Draxl frontend.
-    DraxlParse(draxl_parser::ParseError),
-    /// The imported Draxl output did not validate structurally.
-    Validation(Vec<draxl_validate::ValidationError>),
-}
-
-impl ImportError {
-    /// Returns validation errors when the imported Draxl output failed validation.
-    pub fn validation_errors(&self) -> Option<&[draxl_validate::ValidationError]> {
-        match self {
-            Self::Validation(errors) => Some(errors),
-            Self::RustParse(_) | Self::Unsupported(_) | Self::DraxlParse(_) => None,
-        }
-    }
 }
 
 impl fmt::Display for ImportError {
@@ -44,15 +26,6 @@ impl fmt::Display for ImportError {
         match self {
             Self::RustParse(error) => write!(f, "Rust parse failed: {error}"),
             Self::Unsupported(error) => write!(f, "unsupported Rust syntax: {error}"),
-            Self::DraxlParse(error) => write!(f, "imported Draxl did not parse: {error}"),
-            Self::Validation(errors) => {
-                f.write_str("imported Draxl failed validation:")?;
-                for error in errors {
-                    f.write_str("\n- ")?;
-                    f.write_str(&error.message)?;
-                }
-                Ok(())
-            }
         }
     }
 }
@@ -62,8 +35,6 @@ impl StdError for ImportError {
         match self {
             Self::RustParse(error) => Some(error),
             Self::Unsupported(error) => Some(error),
-            Self::DraxlParse(error) => Some(error),
-            Self::Validation(_) => None,
         }
     }
 }
@@ -111,7 +82,10 @@ impl Placement {
 impl Importer {
     fn import_file(mut self, file: &syn::File) -> Result<ast::File, ImportError> {
         if file.shebang.is_some() {
-            return Err(unsupported(file, "shebang lines are unsupported in Rust import"));
+            return Err(unsupported(
+                file,
+                "shebang lines are unsupported in Rust import",
+            ));
         }
         self.check_attrs(&file.attrs, "file")?;
         let items = file
@@ -152,7 +126,10 @@ impl Importer {
             return Err(unsupported(node, "`unsafe mod` is unsupported"));
         }
         let Some((_, items)) = &node.content else {
-            return Err(unsupported(node, "out-of-line `mod foo;` declarations are unsupported"));
+            return Err(unsupported(
+                node,
+                "out-of-line `mod foo;` declarations are unsupported",
+            ));
         };
         let items = items
             .iter()
@@ -172,9 +149,15 @@ impl Importer {
         placement: Placement,
     ) -> Result<ast::Item, ImportError> {
         self.check_attrs(&node.attrs, "use item")?;
-        self.ensure_inherited_visibility(&node.vis, "use item visibility modifiers are unsupported")?;
+        self.ensure_inherited_visibility(
+            &node.vis,
+            "use item visibility modifiers are unsupported",
+        )?;
         if node.leading_colon.is_some() {
-            return Err(unsupported(node, "leading `::` in `use` items is unsupported"));
+            return Err(unsupported(
+                node,
+                "leading `::` in `use` items is unsupported",
+            ));
         }
         Ok(ast::Item::Use(ast::ItemUse {
             meta: self.meta("u", placement),
@@ -233,7 +216,11 @@ impl Importer {
         }))
     }
 
-    fn import_field(&mut self, field: &syn::Field, index: usize) -> Result<ast::Field, ImportError> {
+    fn import_field(
+        &mut self,
+        field: &syn::Field,
+        index: usize,
+    ) -> Result<ast::Field, ImportError> {
         self.check_attrs(&field.attrs, "struct field")?;
         self.ensure_inherited_visibility(&field.vis, "field visibility modifiers are unsupported")?;
         let Some(ident) = &field.ident else {
@@ -297,7 +284,10 @@ impl Importer {
         placement: Placement,
     ) -> Result<ast::Item, ImportError> {
         self.check_attrs(&node.attrs, "function")?;
-        self.ensure_inherited_visibility(&node.vis, "function visibility modifiers are unsupported")?;
+        self.ensure_inherited_visibility(
+            &node.vis,
+            "function visibility modifiers are unsupported",
+        )?;
         self.ensure_supported_signature(&node.sig)?;
         let params = node
             .sig
@@ -522,7 +512,10 @@ impl Importer {
             syn::Expr::Block(node) => {
                 self.check_attrs(&node.attrs, "expression")?;
                 if node.label.is_some() {
-                    return Err(unsupported(node, "labeled block expressions are unsupported"));
+                    return Err(unsupported(
+                        node,
+                        "labeled block expressions are unsupported",
+                    ));
                 }
                 let mut block = self.import_block(&node.block)?;
                 block.meta = allow_root_meta.then(|| self.detached_meta("e"));
@@ -548,12 +541,14 @@ impl Importer {
                         "integer literal suffixes are unsupported",
                     ));
                 }
-                node.base10_parse::<i64>().map(ast::Literal::Int).map_err(|_| {
-                    unsupported(
-                        span_node,
-                        "only decimal integer literals that fit in `i64` are supported",
-                    )
-                })
+                node.base10_parse::<i64>()
+                    .map(ast::Literal::Int)
+                    .map_err(|_| {
+                        unsupported(
+                            span_node,
+                            "only decimal integer literals that fit in `i64` are supported",
+                        )
+                    })
             }
             syn::Lit::Str(node) => Ok(ast::Literal::Str(node.value())),
             _ => Err(unsupported(
@@ -704,11 +699,10 @@ fn unsupported<T: Spanned>(node: &T, message: impl Into<String>) -> ImportError 
 mod tests {
     use super::import_source;
     use crate::lower_file;
+    use draxl_ast as ast;
 
-    fn lower_imported(imported: &str) -> String {
-        let file = draxl_parser::parse_file(imported).expect("imported source should parse");
-        draxl_validate::validate_file(&file).expect("imported source should validate");
-        lower_file(&file)
+    fn lower_imported(imported: &ast::File) -> String {
+        lower_file(imported)
     }
 
     #[test]
@@ -724,10 +718,16 @@ mod demo {
 
         let imported = import_source(source).expect("simple function should import");
 
-        assert_eq!(
-            imported,
-            "@m0001 mod demo {\n  @f0001[r0001] fn add_one(@p0001[r0001] x: @t0001 i64) -> @t0002 i64 {\n    @s0001[r0001] let @pt0001 y = @e0001 (@e0002 x + @l0001 1);\n    @s0002[r0002] @e0003 y\n  }\n}\n\n"
-        );
+        let [ast::Item::Mod(module)] = imported.items.as_slice() else {
+            panic!("expected one imported module, found {:?}", imported.items);
+        };
+        assert_eq!(module.meta.id, "m0001");
+        let [ast::Item::Fn(function)] = module.items.as_slice() else {
+            panic!("expected one imported function, found {:?}", module.items);
+        };
+        assert_eq!(function.meta.id, "f0001");
+        assert_eq!(function.params[0].meta.id, "p0001");
+        assert_eq!(function.body.stmts.len(), 2);
         assert_eq!(
             lower_imported(&imported),
             "mod demo {\n  fn add_one(x: i64) -> i64 {\n    let y = (x + 1);\n    y\n  }\n}\n\n"
@@ -761,11 +761,26 @@ mod shapes {
 
         let imported = import_source(source).expect("supported Rust subset should import");
 
-        assert!(imported.contains("@u0001[r0001] use std::cmp::{self, *};"));
-        assert!(imported.contains("@st0001[r0002] struct Point {"));
-        assert!(imported.contains("@en0001[r0003] enum Color {"));
-        assert!(imported.contains("fn abs("));
-        assert!(imported.contains("match "));
+        let [ast::Item::Mod(module)] = imported.items.as_slice() else {
+            panic!("expected one imported module, found {:?}", imported.items);
+        };
+        assert_eq!(module.items.len(), 4);
+        assert!(matches!(
+            &module.items[0],
+            ast::Item::Use(node) if node.meta.id == "u0001"
+        ));
+        assert!(matches!(
+            &module.items[1],
+            ast::Item::Struct(node) if node.meta.id == "st0001" && node.fields.len() == 2
+        ));
+        assert!(matches!(
+            &module.items[2],
+            ast::Item::Enum(node) if node.meta.id == "en0001" && node.variants.len() == 2
+        ));
+        assert!(matches!(
+            &module.items[3],
+            ast::Item::Fn(node) if node.name == "abs" && node.body.stmts.len() == 1
+        ));
         assert_eq!(
             lower_imported(&imported),
             "mod shapes {\n  use std::cmp::{self, *};\n\n  struct Point {\n    x: i64,\n    y: i64,\n  }\n\n  enum Color {\n    Red,\n    Green,\n  }\n\n  fn abs(x: i64) -> i64 {\n    match x {\n      n if (n < 0) => (-n),\n      _ => x,\n    }\n  }\n}\n\n"
@@ -774,7 +789,8 @@ mod shapes {
 
     #[test]
     fn rejects_generics_and_visibility() {
-        let error = import_source("pub fn run<T>(x: T) {}\n").expect_err("unsupported syntax should fail");
+        let error =
+            import_source("pub fn run<T>(x: T) {}\n").expect_err("unsupported syntax should fail");
         let message = error.to_string();
         assert!(
             message.contains("visibility modifiers") || message.contains("generics"),
@@ -787,7 +803,9 @@ mod shapes {
         let macro_error = import_source("fn run() { println!(\"hi\"); }\n")
             .expect_err("statement macro should fail");
         assert!(
-            macro_error.to_string().contains("statement macros are unsupported")
+            macro_error
+                .to_string()
+                .contains("statement macros are unsupported")
                 || macro_error.to_string().contains("expression is outside"),
             "unexpected error: {macro_error}"
         );

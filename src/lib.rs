@@ -53,8 +53,7 @@ impl Error {
     pub fn validation_errors(&self) -> Option<&[validate::ValidationError]> {
         match self {
             Self::Validation(errors) => Some(errors),
-            Self::RustImport(error) => error.validation_errors(),
-            Self::Parse(_) => None,
+            Self::Parse(_) | Self::RustImport(_) => None,
         }
     }
 }
@@ -176,7 +175,10 @@ pub fn lower_rust_source(source: &str) -> Result<String> {
 
 /// Imports ordinary Rust source into canonical Draxl Rust-profile source.
 pub fn import_rust_source(source: &str) -> Result<String> {
-    rust::import_source(source).map_err(Error::RustImport)
+    let imported = rust::import_source(source)?;
+    let printed = format_file_for_language(LowerLanguage::Rust, &imported);
+    let file = parse_and_validate_for_language(LowerLanguage::Rust, &printed)?;
+    Ok(format_file_for_language(LowerLanguage::Rust, &file))
 }
 
 /// Applies a single structured patch operation.

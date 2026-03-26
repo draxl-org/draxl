@@ -4,10 +4,9 @@
 //! strips Draxl metadata and preserves only the modeled Rust subset.
 
 use draxl_ast::{
-    BinaryOp, Block, CommentNode, DocNode, Expr, File, Item, ItemFn, Literal, Path, Pattern, Stmt,
-    Type, UnaryOp, UseTree,
+    canonicalize_file, BinaryOp, Block, CommentNode, DocNode, Expr, File, Item, ItemFn, Literal,
+    Path, Pattern, Stmt, Type, UnaryOp, UseTree,
 };
-use draxl_printer::canonicalize_file;
 
 /// Lowers a validated Draxl file to ordinary Rust.
 pub fn lower_file(file: &File) -> String {

@@ -1,4 +1,4 @@
-use crate::canonical::canonicalize_file;
+use crate::canonicalize_file;
 use draxl_ast::{
     BinaryOp, CommentNode, DocNode, Expr, File, Item, ItemFn, Literal, Meta, Param, Path, Pattern,
     Stmt, Type, UnaryOp, UseTree, Variant,

@@ -66,9 +66,6 @@ name = "draxl-rust"
 version = "0.1.0"
 dependencies = [
  "draxl-ast",
- "draxl-parser",
- "draxl-printer",
- "draxl-validate",
  "syn",
 ]
 

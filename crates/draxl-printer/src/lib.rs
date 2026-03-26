@@ -1,22 +1,18 @@
 #![forbid(unsafe_code)]
 //! Language-dispatch facade for canonical Draxl rendering.
 //!
-//! This crate has two responsibilities:
-//!
-//! - canonicalize AST containers so ranked children and attached trivia are in
-//!   deterministic order
-//! - render the AST back into compact Draxl surface syntax
+//! This crate renders the AST back into compact Draxl surface syntax and
+//! re-exports the shared canonicalization helper from `draxl-ast`.
 //!
 //! Today the crate exposes only the Rust backend, but the public rendering
 //! surface is language-aware so additional backends can be added behind the
 //! same facade over time.
 
-mod canonical;
 mod render;
 
 use draxl_ast::{File, LowerLanguage};
 
-pub use canonical::canonicalize_file;
+pub use draxl_ast::canonicalize_file;
 
 mod rust_backend {
     use super::render;

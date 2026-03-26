@@ -10,7 +10,11 @@
 //! It deliberately does not own parsing, validation rules, formatting policy,
 //! lowering, or patch application.
 
+mod canonical;
+
 use std::fmt::Write;
+
+pub use canonical::canonicalize_file;
 
 /// Stable identifier attached to an Draxl node.
 pub type NodeId = String;

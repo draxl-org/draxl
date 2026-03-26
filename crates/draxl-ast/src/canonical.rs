@@ -1,4 +1,4 @@
-use draxl_ast::{
+use crate::{
     Block, Expr, ExprBinary, ExprCall, ExprGroup, ExprMatch, ExprUnary, File, Item, ItemEnum,
     ItemFn, ItemMod, ItemStruct, ItemUse, MatchArm, Meta, Stmt, StmtExpr, StmtLet,
 };
@@ -10,7 +10,7 @@ pub fn canonicalize_file(file: &File) -> File {
     }
 }
 
-pub(crate) fn canonicalize_items(items: &[Item], ordered: bool) -> Vec<Item> {
+fn canonicalize_items(items: &[Item], ordered: bool) -> Vec<Item> {
     let mut trivia = Vec::new();
     let mut pending = Vec::new();
     let mut semantic = Vec::new();
@@ -95,7 +95,7 @@ fn canonicalize_item(item: &Item) -> Item {
     }
 }
 
-pub(crate) fn canonicalize_block(block: &Block) -> Block {
+fn canonicalize_block(block: &Block) -> Block {
     let mut trivia = Vec::new();
     let mut pending = Vec::new();
     let mut semantic = Vec::new();
@@ -249,14 +249,14 @@ fn attach_stmt_trivia(
     out
 }
 
-pub(crate) fn meta_sort_key(meta: &Meta) -> (String, String) {
+fn meta_sort_key(meta: &Meta) -> (String, String) {
     (
         meta.rank.clone().unwrap_or_else(|| "~".to_owned()),
         meta.id.clone(),
     )
 }
 
-pub(crate) fn stmt_sort_key(stmt: &Stmt) -> (String, String) {
+fn stmt_sort_key(stmt: &Stmt) -> (String, String) {
     let meta = stmt
         .meta()
         .expect("semantic block children always carry metadata");
