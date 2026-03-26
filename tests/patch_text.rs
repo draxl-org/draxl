@@ -3,6 +3,7 @@ mod support;
 use draxl::{
     self,
     patch::{PatchDest, PatchNode, PatchOp, PatchPath, PatchValue, RankedDest, SlotOwner, SlotRef},
+    LowerLanguage,
 };
 use draxl_printer::print_file;
 use draxl_validate::validate_file;
@@ -68,6 +69,19 @@ replace @e4: @e4 audit()
 }
 
 #[test]
+fn patch_resolution_dispatch_matches_default_rust_backend() {
+    let source = read("examples/01_add.rs.dx");
+    let file = draxl::parse_and_validate(&source).expect("example should parse");
+    let patch = "replace @e3: @e3 y_plus_one\n";
+
+    let default = draxl::resolve_patch_ops(&file, patch).expect("patch should resolve");
+    let explicit = draxl::resolve_patch_ops_for_language(LowerLanguage::Rust, &file, patch)
+        .expect("explicit rust patch resolution should succeed");
+
+    assert_eq!(explicit, default);
+}
+
+#[test]
 fn apply_patch_text_updates_the_tree_end_to_end() {
     let source = r#"
 @m1 mod demo {
@@ -91,6 +105,20 @@ clear @d1.text
     assert!(formatted.contains("@d1->f1 ///\n"));
     assert!(formatted.contains("fn renamed_first()"));
     assert!(formatted.contains("fn second()"));
+}
+
+#[test]
+fn patch_application_dispatch_matches_default_rust_backend() {
+    let source = read("examples/01_add.rs.dx");
+    let mut default_file = draxl::parse_and_validate(&source).expect("example should parse");
+    let mut explicit_file = draxl::parse_and_validate(&source).expect("example should parse");
+    let patch = "replace @e3: @e3 y_plus_one\n";
+
+    draxl::apply_patch_text(&mut default_file, patch).expect("default patch path should apply");
+    draxl::apply_patch_text_for_language(LowerLanguage::Rust, &mut explicit_file, patch)
+        .expect("explicit rust patch path should apply");
+
+    assert_eq!(explicit_file, default_file);
 }
 
 #[test]

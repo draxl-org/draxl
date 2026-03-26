@@ -10,7 +10,7 @@ use crate::schema::{
     ranked_slot_spec, replace_fragment_kind, single_slot_spec, value_kind_label, FragmentKind,
     NodeKind, ValueKind,
 };
-use draxl_ast::{File, Span};
+use draxl_ast::{File, LowerLanguage, Span};
 
 #[derive(Debug, Clone)]
 pub(super) struct ResolvedPatchOp {
@@ -19,6 +19,7 @@ pub(super) struct ResolvedPatchOp {
 }
 
 pub(super) fn resolve_patch_ops(
+    language: LowerLanguage,
     file: &File,
     source: &str,
     surface_ops: &[SurfacePatchOp],
@@ -26,7 +27,7 @@ pub(super) fn resolve_patch_ops(
     let mut working = file.clone();
     let mut resolved = Vec::with_capacity(surface_ops.len());
     for surface_op in surface_ops {
-        let op = resolve_op(&working, source, surface_op)?;
+        let op = resolve_op(language, &working, source, surface_op)?;
         crate::apply_op(&mut working, op.op.clone())
             .map_err(|err| patch_text_error(source, surface_op.span(), &err.message))?;
         resolved.push(op);
@@ -35,6 +36,7 @@ pub(super) fn resolve_patch_ops(
 }
 
 pub(super) fn resolve_op(
+    language: LowerLanguage,
     file: &File,
     source: &str,
     surface_op: &SurfacePatchOp,
@@ -49,7 +51,7 @@ pub(super) fn resolve_op(
                 .expect("ranked destination fragment kind must already be validated before use");
             PatchOp::Insert {
                 dest: resolved_dest,
-                node: parse_fragment(source, fragment, fragment_kind)?,
+                node: parse_fragment(language, source, fragment, fragment_kind)?,
             }
         }
         SurfacePatchOp::Put { slot, fragment, .. } => {
@@ -65,7 +67,7 @@ pub(super) fn resolve_op(
                 })?;
             PatchOp::Put {
                 slot: resolve_slot_ref(file, source, slot)?,
-                node: parse_fragment(source, fragment, fragment_kind)?,
+                node: parse_fragment(language, source, fragment, fragment_kind)?,
             }
         }
         SurfacePatchOp::Replace {
@@ -74,7 +76,12 @@ pub(super) fn resolve_op(
             let target_kind = resolve_node_kind(file, source, target)?;
             PatchOp::Replace {
                 target_id: target.id.clone(),
-                replacement: parse_fragment(source, fragment, replace_fragment_kind(target_kind))?,
+                replacement: parse_fragment(
+                    language,
+                    source,
+                    fragment,
+                    replace_fragment_kind(target_kind),
+                )?,
             }
         }
         SurfacePatchOp::Delete { target, .. } => PatchOp::Delete {
@@ -232,44 +239,67 @@ fn resolve_value(
 }
 
 fn parse_fragment(
+    language: LowerLanguage,
     source: &str,
     fragment: &SurfaceFragment,
     fragment_kind: FragmentKind,
 ) -> Result<PatchNode, PatchTextError> {
     match fragment_kind {
-        FragmentKind::Item => draxl_parser::parse_item_fragment(&fragment.source)
-            .map(PatchNode::Item)
-            .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error)),
-        FragmentKind::Field => draxl_parser::parse_field_fragment(&fragment.source)
-            .map(PatchNode::Field)
-            .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error)),
-        FragmentKind::Variant => draxl_parser::parse_variant_fragment(&fragment.source)
-            .map(PatchNode::Variant)
-            .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error)),
-        FragmentKind::Param => draxl_parser::parse_param_fragment(&fragment.source)
-            .map(PatchNode::Param)
-            .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error)),
-        FragmentKind::Stmt => draxl_parser::parse_stmt_fragment(&fragment.source)
-            .map(PatchNode::Stmt)
-            .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error)),
-        FragmentKind::MatchArm => draxl_parser::parse_match_arm_fragment(&fragment.source)
-            .map(PatchNode::MatchArm)
-            .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error)),
-        FragmentKind::Expr => draxl_parser::parse_expr_fragment(&fragment.source)
-            .map(PatchNode::Expr)
-            .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error)),
-        FragmentKind::Type => draxl_parser::parse_type_fragment(&fragment.source)
-            .map(PatchNode::Type)
-            .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error)),
-        FragmentKind::Pattern => draxl_parser::parse_pattern_fragment(&fragment.source)
-            .map(PatchNode::Pattern)
-            .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error)),
-        FragmentKind::Doc => draxl_parser::parse_doc_fragment(&fragment.source)
-            .map(PatchNode::Doc)
-            .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error)),
-        FragmentKind::Comment => draxl_parser::parse_comment_fragment(&fragment.source)
-            .map(PatchNode::Comment)
-            .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error)),
+        FragmentKind::Item => {
+            draxl_parser::parse_item_fragment_for_language(language, &fragment.source)
+                .map(PatchNode::Item)
+                .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error))
+        }
+        FragmentKind::Field => {
+            draxl_parser::parse_field_fragment_for_language(language, &fragment.source)
+                .map(PatchNode::Field)
+                .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error))
+        }
+        FragmentKind::Variant => {
+            draxl_parser::parse_variant_fragment_for_language(language, &fragment.source)
+                .map(PatchNode::Variant)
+                .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error))
+        }
+        FragmentKind::Param => {
+            draxl_parser::parse_param_fragment_for_language(language, &fragment.source)
+                .map(PatchNode::Param)
+                .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error))
+        }
+        FragmentKind::Stmt => {
+            draxl_parser::parse_stmt_fragment_for_language(language, &fragment.source)
+                .map(PatchNode::Stmt)
+                .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error))
+        }
+        FragmentKind::MatchArm => {
+            draxl_parser::parse_match_arm_fragment_for_language(language, &fragment.source)
+                .map(PatchNode::MatchArm)
+                .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error))
+        }
+        FragmentKind::Expr => {
+            draxl_parser::parse_expr_fragment_for_language(language, &fragment.source)
+                .map(PatchNode::Expr)
+                .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error))
+        }
+        FragmentKind::Type => {
+            draxl_parser::parse_type_fragment_for_language(language, &fragment.source)
+                .map(PatchNode::Type)
+                .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error))
+        }
+        FragmentKind::Pattern => {
+            draxl_parser::parse_pattern_fragment_for_language(language, &fragment.source)
+                .map(PatchNode::Pattern)
+                .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error))
+        }
+        FragmentKind::Doc => {
+            draxl_parser::parse_doc_fragment_for_language(language, &fragment.source)
+                .map(PatchNode::Doc)
+                .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error))
+        }
+        FragmentKind::Comment => {
+            draxl_parser::parse_comment_fragment_for_language(language, &fragment.source)
+                .map(PatchNode::Comment)
+                .map_err(|error| map_fragment_parse_error(source, fragment.span.start, error))
+        }
     }
 }
 

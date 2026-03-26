@@ -18,7 +18,8 @@ pub use model::{
     PatchDest, PatchNode, PatchOp, PatchPath, PatchValue, RankedDest, SlotOwner, SlotRef,
 };
 pub use text::{
-    apply_patch_text, parse_patch_ops, resolve_patch_ops, PatchTextError, SurfaceDest,
-    SurfaceFragment, SurfaceNodeRef, SurfacePatchOp, SurfacePath, SurfacePathSegment,
-    SurfaceRankedDest, SurfaceSlotOwner, SurfaceSlotRef, SurfaceValue, SurfaceValueKind,
+    apply_patch_text, apply_patch_text_for_language, parse_patch_ops, resolve_patch_ops,
+    resolve_patch_ops_for_language, PatchTextError, SurfaceDest, SurfaceFragment, SurfaceNodeRef,
+    SurfacePatchOp, SurfacePath, SurfacePathSegment, SurfaceRankedDest, SurfaceSlotOwner,
+    SurfaceSlotRef, SurfaceValue, SurfaceValueKind,
 };

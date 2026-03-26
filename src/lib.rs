@@ -209,7 +209,16 @@ pub fn resolve_patch_ops(
     file: &ast::File,
     source: &str,
 ) -> std::result::Result<Vec<patch::PatchOp>, patch::PatchTextError> {
-    patch::resolve_patch_ops(file, source)
+    resolve_patch_ops_for_language(LowerLanguage::Rust, file, source)
+}
+
+/// Resolves textual patch ops against the current file using the selected lower language.
+pub fn resolve_patch_ops_for_language(
+    language: LowerLanguage,
+    file: &ast::File,
+    source: &str,
+) -> std::result::Result<Vec<patch::PatchOp>, patch::PatchTextError> {
+    patch::resolve_patch_ops_for_language(language, file, source)
 }
 
 /// Parses, resolves, and applies textual patch ops in order.
@@ -217,7 +226,16 @@ pub fn apply_patch_text(
     file: &mut ast::File,
     source: &str,
 ) -> std::result::Result<(), patch::PatchTextError> {
-    patch::apply_patch_text(file, source)
+    apply_patch_text_for_language(LowerLanguage::Rust, file, source)
+}
+
+/// Parses, resolves, and applies textual patch ops in order using the selected lower language.
+pub fn apply_patch_text_for_language(
+    language: LowerLanguage,
+    file: &mut ast::File,
+    source: &str,
+) -> std::result::Result<(), patch::PatchTextError> {
+    patch::apply_patch_text_for_language(language, file, source)
 }
 
 /// Checks whether two patch streams have hard conflicts against the same base.
