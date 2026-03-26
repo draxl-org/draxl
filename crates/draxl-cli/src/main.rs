@@ -5,12 +5,13 @@
 //! parser, validator, printer, and lowering behavior itself.
 
 use draxl::{
-    apply_patch_text, check_conflicts_json, dump_json_source, format_file, format_source,
-    lower_rust_source, parse_and_validate, parse_file, resolve_patch_ops, validate_file,
+    apply_patch_text_for_language, check_conflicts_json, dump_json_file, format_file_for_language,
+    format_source_for_language, lower_rust_source, parse_and_validate_for_language,
+    parse_file_for_language, resolve_patch_ops_for_language, validate_file, LowerLanguage,
 };
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -32,8 +33,9 @@ fn run() -> Result<(), String> {
     match command.as_str() {
         "parse" => {
             let path = parse_path_arg(args.next(), "parse")?;
+            let language = detect_lower_language(&path)?;
             let source = read_source(&path)?;
-            let file = parse_file(&source).map_err(|err| err.to_string())?;
+            let file = parse_file_for_language(language, &source).map_err(|err| err.to_string())?;
             println!(
                 "parsed {}: {} top-level item(s)",
                 path.display(),
@@ -48,8 +50,10 @@ fn run() -> Result<(), String> {
                 _ => (false, first),
             };
             let path = parse_path_arg(path_arg, "fmt")?;
+            let language = detect_lower_language(&path)?;
             let source = read_source(&path)?;
-            let formatted = format_source(&source).map_err(|err| err.to_string())?;
+            let formatted =
+                format_source_for_language(language, &source).map_err(|err| err.to_string())?;
             if in_place {
                 fs::write(&path, formatted)
                     .map_err(|err| format!("failed to write {}: {err}", path.display()))?;
@@ -60,17 +64,18 @@ fn run() -> Result<(), String> {
         }
         "dump-json" => {
             let path = parse_path_arg(args.next(), "dump-json")?;
+            let language = detect_lower_language(&path)?;
             let source = read_source(&path)?;
-            print!(
-                "{}",
-                dump_json_source(&source).map_err(|err| err.to_string())?
-            );
+            let file = parse_and_validate_for_language(language, &source)
+                .map_err(|err| err.to_string())?;
+            print!("{}", dump_json_file(&file));
             Ok(())
         }
         "validate" => {
             let path = parse_path_arg(args.next(), "validate")?;
+            let language = detect_lower_language(&path)?;
             let source = read_source(&path)?;
-            let file = parse_file(&source).map_err(|err| err.to_string())?;
+            let file = parse_file_for_language(language, &source).map_err(|err| err.to_string())?;
             validate_file(&file).map_err(format_validation_errors)?;
             println!("valid {}", path.display());
             Ok(())
@@ -92,12 +97,15 @@ fn run() -> Result<(), String> {
             };
             let path = parse_path_arg(file_arg, "patch")?;
             let patch_path = parse_path_arg(patch_arg, "patch")?;
+            let language = detect_lower_language(&path)?;
             let source = read_source(&path)?;
-            let mut file = parse_and_validate(&source).map_err(|err| err.to_string())?;
+            let mut file = parse_and_validate_for_language(language, &source)
+                .map_err(|err| err.to_string())?;
             let patch_text = read_source(&patch_path)?;
-            apply_patch_text(&mut file, &patch_text).map_err(|err| err.to_string())?;
+            apply_patch_text_for_language(language, &mut file, &patch_text)
+                .map_err(|err| err.to_string())?;
             validate_file(&file).map_err(format_validation_errors)?;
-            let formatted = format_file(&file);
+            let formatted = format_file_for_language(language, &file);
             if in_place {
                 fs::write(&path, formatted)
                     .map_err(|err| format!("failed to write {}: {err}", path.display()))?;
@@ -110,13 +118,16 @@ fn run() -> Result<(), String> {
             let path = parse_path_arg(args.next(), "conflicts")?;
             let left_patch_path = parse_path_arg(args.next(), "conflicts")?;
             let right_patch_path = parse_path_arg(args.next(), "conflicts")?;
+            let language = detect_lower_language(&path)?;
             let source = read_source(&path)?;
-            let file = parse_and_validate(&source).map_err(|err| err.to_string())?;
+            let file = parse_and_validate_for_language(language, &source)
+                .map_err(|err| err.to_string())?;
             let left_patch = read_source(&left_patch_path)?;
             let right_patch = read_source(&right_patch_path)?;
-            let left_ops = resolve_patch_ops(&file, &left_patch).map_err(|err| err.to_string())?;
-            let right_ops =
-                resolve_patch_ops(&file, &right_patch).map_err(|err| err.to_string())?;
+            let left_ops = resolve_patch_ops_for_language(language, &file, &left_patch)
+                .map_err(|err| err.to_string())?;
+            let right_ops = resolve_patch_ops_for_language(language, &file, &right_patch)
+                .map_err(|err| err.to_string())?;
             print!("{}", check_conflicts_json(&file, &left_ops, &right_ops));
             Ok(())
         }
@@ -131,6 +142,24 @@ fn read_source(path: &PathBuf) -> Result<String, String> {
 fn parse_path_arg(arg: Option<String>, command: &str) -> Result<PathBuf, String> {
     arg.map(PathBuf::from)
         .ok_or_else(|| format!("missing file path for `{command}`\n\n{}", usage()))
+}
+
+fn detect_lower_language(path: &Path) -> Result<LowerLanguage, String> {
+    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+        return Err(format!(
+            "could not infer lower language from {}: path is not valid utf-8",
+            path.display()
+        ));
+    };
+
+    if name.ends_with(".rs.dx") {
+        Ok(LowerLanguage::Rust)
+    } else {
+        Err(format!(
+            "could not infer lower language from {}: expected a supported source extension like `.rs.dx`",
+            path.display()
+        ))
+    }
 }
 
 fn format_validation_errors(errors: Vec<draxl::validate::ValidationError>) -> String {

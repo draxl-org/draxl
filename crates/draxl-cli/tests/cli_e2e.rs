@@ -86,6 +86,22 @@ fn validate_command_reports_errors_on_invalid_input() {
 }
 
 #[test]
+fn parse_command_rejects_unknown_source_extension() {
+    let path = write_temp_file(
+        "unknown.dx",
+        r#"
+@m1 mod demo {
+  @f1[a] fn run() {}
+}
+"#,
+    );
+
+    let output = run_err(&["parse", path.to_str().unwrap()]);
+    assert!(output.contains("could not infer lower language"));
+    assert!(output.contains(".rs.dx"));
+}
+
+#[test]
 fn patch_command_applies_textual_patch_ops() {
     let source_path = write_temp_file(
         "patch_source.rs.dx",
