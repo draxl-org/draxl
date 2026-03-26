@@ -8,25 +8,14 @@
 //! surface is language-aware so additional backends can be added behind the
 //! same facade over time.
 
-mod render;
-
 use draxl_ast::{File, LowerLanguage};
 
 pub use draxl_ast::canonicalize_file;
 
-mod rust_backend {
-    use super::render;
-    use draxl_ast::File;
-
-    pub(super) fn print_file(file: &File) -> String {
-        render::print_file(file)
-    }
-}
-
 /// Prints a file using the selected language backend.
 pub fn print_file_for_language(language: LowerLanguage, file: &File) -> String {
     match language {
-        LowerLanguage::Rust => rust_backend::print_file(file),
+        LowerLanguage::Rust => draxl_rust::print_file(file),
     }
 }
 

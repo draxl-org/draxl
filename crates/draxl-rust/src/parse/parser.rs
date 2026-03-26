@@ -1,5 +1,5 @@
-use crate::error::{parse_error, ParseError};
-use crate::syntax::{PendingMeta, Token, TokenKind};
+use super::error::{parse_error, ParseError};
+use super::syntax::{PendingMeta, Token, TokenKind};
 use draxl_ast::{
     BinaryOp, Block, CommentNode, DocNode, Expr, ExprBinary, ExprCall, ExprGroup, ExprLit,
     ExprMatch, ExprPath, ExprUnary, Field, File, Item, ItemEnum, ItemFn, ItemMod, ItemStruct,

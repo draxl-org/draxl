@@ -1,7 +1,6 @@
-use crate::canonicalize_file;
 use draxl_ast::{
-    BinaryOp, CommentNode, DocNode, Expr, File, Item, ItemFn, Literal, Meta, Param, Path, Pattern,
-    Stmt, Type, UnaryOp, UseTree, Variant,
+    canonicalize_file, BinaryOp, CommentNode, DocNode, Expr, File, Item, ItemFn, Literal, Meta,
+    Param, Path, Pattern, Stmt, Type, UnaryOp, UseTree, Variant,
 };
 
 /// Prints a file into canonical Draxl source.

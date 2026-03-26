@@ -6,10 +6,11 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "Canonical source printer for Draxl"
+description = "Language-dispatch facade for Draxl rendering"
 documentation = "https://docs.rs/draxl-printer"
 keywords = ["printer", "formatter", "syntax", "rust", "ai"]
 categories = ["compilers", "development-tools"]
 
 [dependencies]
 draxl-ast.workspace = true
+draxl-rust.workspace = true

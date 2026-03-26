@@ -5,90 +5,17 @@
 //! surface is language-aware so additional backends can be added behind the
 //! same facade over time.
 
-mod error;
-mod lexer;
-mod parser;
-mod syntax;
-
 use draxl_ast::{
     CommentNode, DocNode, Expr, Field, File, Item, LowerLanguage, MatchArm, Param, Pattern, Stmt,
     Type, Variant,
 };
 
-pub use error::ParseError;
-
-mod rust_backend {
-    use super::{lexer, parser, ParseError};
-    use draxl_ast::{
-        CommentNode, DocNode, Expr, Field, File, Item, MatchArm, Param, Pattern, Stmt, Type,
-        Variant,
-    };
-
-    pub(super) fn parse_file(source: &str) -> Result<File, ParseError> {
-        let tokens = lexer::lex(source)?;
-        parser::Parser::new(source, tokens).parse_file()
-    }
-
-    pub(super) fn parse_item_fragment(source: &str) -> Result<Item, ParseError> {
-        let tokens = lexer::lex(source)?;
-        parser::Parser::new(source, tokens).parse_item_fragment()
-    }
-
-    pub(super) fn parse_field_fragment(source: &str) -> Result<Field, ParseError> {
-        let tokens = lexer::lex(source)?;
-        parser::Parser::new(source, tokens).parse_field_fragment()
-    }
-
-    pub(super) fn parse_variant_fragment(source: &str) -> Result<Variant, ParseError> {
-        let tokens = lexer::lex(source)?;
-        parser::Parser::new(source, tokens).parse_variant_fragment()
-    }
-
-    pub(super) fn parse_param_fragment(source: &str) -> Result<Param, ParseError> {
-        let tokens = lexer::lex(source)?;
-        parser::Parser::new(source, tokens).parse_param_fragment()
-    }
-
-    pub(super) fn parse_stmt_fragment(source: &str) -> Result<Stmt, ParseError> {
-        let tokens = lexer::lex(source)?;
-        parser::Parser::new(source, tokens).parse_stmt_fragment()
-    }
-
-    pub(super) fn parse_match_arm_fragment(source: &str) -> Result<MatchArm, ParseError> {
-        let tokens = lexer::lex(source)?;
-        parser::Parser::new(source, tokens).parse_match_arm_fragment()
-    }
-
-    pub(super) fn parse_expr_fragment(source: &str) -> Result<Expr, ParseError> {
-        let tokens = lexer::lex(source)?;
-        parser::Parser::new(source, tokens).parse_expr_fragment()
-    }
-
-    pub(super) fn parse_type_fragment(source: &str) -> Result<Type, ParseError> {
-        let tokens = lexer::lex(source)?;
-        parser::Parser::new(source, tokens).parse_type_fragment()
-    }
-
-    pub(super) fn parse_pattern_fragment(source: &str) -> Result<Pattern, ParseError> {
-        let tokens = lexer::lex(source)?;
-        parser::Parser::new(source, tokens).parse_pattern_fragment()
-    }
-
-    pub(super) fn parse_doc_fragment(source: &str) -> Result<DocNode, ParseError> {
-        let tokens = lexer::lex(source)?;
-        parser::Parser::new(source, tokens).parse_doc_fragment()
-    }
-
-    pub(super) fn parse_comment_fragment(source: &str) -> Result<CommentNode, ParseError> {
-        let tokens = lexer::lex(source)?;
-        parser::Parser::new(source, tokens).parse_comment_fragment()
-    }
-}
+pub use draxl_rust::ParseError;
 
 /// Parses Draxl source into the bootstrap AST using the selected language backend.
 pub fn parse_file_for_language(language: LowerLanguage, source: &str) -> Result<File, ParseError> {
     match language {
-        LowerLanguage::Rust => rust_backend::parse_file(source),
+        LowerLanguage::Rust => draxl_rust::parse_file(source),
     }
 }
 
@@ -103,7 +30,7 @@ pub fn parse_item_fragment_for_language(
     source: &str,
 ) -> Result<Item, ParseError> {
     match language {
-        LowerLanguage::Rust => rust_backend::parse_item_fragment(source),
+        LowerLanguage::Rust => draxl_rust::parse_item_fragment(source),
     }
 }
 
@@ -118,7 +45,7 @@ pub fn parse_field_fragment_for_language(
     source: &str,
 ) -> Result<Field, ParseError> {
     match language {
-        LowerLanguage::Rust => rust_backend::parse_field_fragment(source),
+        LowerLanguage::Rust => draxl_rust::parse_field_fragment(source),
     }
 }
 
@@ -133,7 +60,7 @@ pub fn parse_variant_fragment_for_language(
     source: &str,
 ) -> Result<Variant, ParseError> {
     match language {
-        LowerLanguage::Rust => rust_backend::parse_variant_fragment(source),
+        LowerLanguage::Rust => draxl_rust::parse_variant_fragment(source),
     }
 }
 
@@ -148,7 +75,7 @@ pub fn parse_param_fragment_for_language(
     source: &str,
 ) -> Result<Param, ParseError> {
     match language {
-        LowerLanguage::Rust => rust_backend::parse_param_fragment(source),
+        LowerLanguage::Rust => draxl_rust::parse_param_fragment(source),
     }
 }
 
@@ -163,7 +90,7 @@ pub fn parse_stmt_fragment_for_language(
     source: &str,
 ) -> Result<Stmt, ParseError> {
     match language {
-        LowerLanguage::Rust => rust_backend::parse_stmt_fragment(source),
+        LowerLanguage::Rust => draxl_rust::parse_stmt_fragment(source),
     }
 }
 
@@ -178,7 +105,7 @@ pub fn parse_match_arm_fragment_for_language(
     source: &str,
 ) -> Result<MatchArm, ParseError> {
     match language {
-        LowerLanguage::Rust => rust_backend::parse_match_arm_fragment(source),
+        LowerLanguage::Rust => draxl_rust::parse_match_arm_fragment(source),
     }
 }
 
@@ -193,7 +120,7 @@ pub fn parse_expr_fragment_for_language(
     source: &str,
 ) -> Result<Expr, ParseError> {
     match language {
-        LowerLanguage::Rust => rust_backend::parse_expr_fragment(source),
+        LowerLanguage::Rust => draxl_rust::parse_expr_fragment(source),
     }
 }
 
@@ -208,7 +135,7 @@ pub fn parse_type_fragment_for_language(
     source: &str,
 ) -> Result<Type, ParseError> {
     match language {
-        LowerLanguage::Rust => rust_backend::parse_type_fragment(source),
+        LowerLanguage::Rust => draxl_rust::parse_type_fragment(source),
     }
 }
 
@@ -223,7 +150,7 @@ pub fn parse_pattern_fragment_for_language(
     source: &str,
 ) -> Result<Pattern, ParseError> {
     match language {
-        LowerLanguage::Rust => rust_backend::parse_pattern_fragment(source),
+        LowerLanguage::Rust => draxl_rust::parse_pattern_fragment(source),
     }
 }
 
@@ -238,7 +165,7 @@ pub fn parse_doc_fragment_for_language(
     source: &str,
 ) -> Result<DocNode, ParseError> {
     match language {
-        LowerLanguage::Rust => rust_backend::parse_doc_fragment(source),
+        LowerLanguage::Rust => draxl_rust::parse_doc_fragment(source),
     }
 }
 
@@ -253,7 +180,7 @@ pub fn parse_comment_fragment_for_language(
     source: &str,
 ) -> Result<CommentNode, ParseError> {
     match language {
-        LowerLanguage::Rust => rust_backend::parse_comment_fragment(source),
+        LowerLanguage::Rust => draxl_rust::parse_comment_fragment(source),
     }
 }
 

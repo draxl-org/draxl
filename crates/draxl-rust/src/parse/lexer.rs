@@ -1,5 +1,5 @@
-use crate::error::{parse_error, ParseError};
-use crate::syntax::{token, Token, TokenKind};
+use super::error::{parse_error, ParseError};
+use super::syntax::{token, Token, TokenKind};
 use draxl_ast::Span;
 
 pub(crate) fn lex(source: &str) -> Result<Vec<Token>, ParseError> {
