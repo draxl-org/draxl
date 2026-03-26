@@ -7,6 +7,7 @@
 pub mod import;
 pub mod lower;
 pub mod parse;
+pub mod patch_schema;
 pub mod render;
 
 pub use import::{import_source, ImportError};

@@ -53,6 +53,7 @@ version = "0.1.0"
 dependencies = [
  "draxl-ast",
  "draxl-parser",
+ "draxl-rust",
 ]
 
 [[package]]
