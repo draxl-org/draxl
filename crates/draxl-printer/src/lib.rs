@@ -1,17 +1,40 @@
 #![forbid(unsafe_code)]
-//! Canonical printer for Draxl.
+//! Language-dispatch facade for canonical Draxl rendering.
 //!
 //! This crate has two responsibilities:
 //!
 //! - canonicalize AST containers so ranked children and attached trivia are in
 //!   deterministic order
-//! - render the canonical tree back into compact Draxl surface syntax
+//! - render the AST back into compact Draxl surface syntax
 //!
-//! Keeping those steps separate makes it easier to reason about whether a
-//! change affects semantic ordering, textual formatting, or both.
+//! Today the crate exposes only the Rust backend, but the public rendering
+//! surface is language-aware so additional backends can be added behind the
+//! same facade over time.
 
 mod canonical;
 mod render;
 
+use draxl_ast::{File, LowerLanguage};
+
 pub use canonical::canonicalize_file;
-pub use render::print_file;
+
+mod rust_backend {
+    use super::render;
+    use draxl_ast::File;
+
+    pub(super) fn print_file(file: &File) -> String {
+        render::print_file(file)
+    }
+}
+
+/// Prints a file using the selected language backend.
+pub fn print_file_for_language(language: LowerLanguage, file: &File) -> String {
+    match language {
+        LowerLanguage::Rust => rust_backend::print_file(file),
+    }
+}
+
+/// Prints a file using the default Rust backend.
+pub fn print_file(file: &File) -> String {
+    print_file_for_language(LowerLanguage::Rust, file)
+}

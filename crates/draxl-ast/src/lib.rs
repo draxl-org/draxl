@@ -21,6 +21,13 @@ pub type Rank = String;
 /// Explicit name for the slot that owns a node.
 pub type SlotName = String;
 
+/// Ordinary language a Draxl source file is intended to lower into.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LowerLanguage {
+    /// Draxl Rust profile over `.rs.dx` files.
+    Rust,
+}
+
 /// Byte range in the original source file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {

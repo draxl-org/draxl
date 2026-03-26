@@ -13,4 +13,7 @@ categories = ["compilers", "development-tools"]
 
 [dependencies]
 draxl-ast.workspace = true
+draxl-parser.workspace = true
 draxl-printer.workspace = true
+draxl-validate.workspace = true
+syn.workspace = true

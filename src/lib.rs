@@ -25,6 +25,7 @@ use std::error::Error as StdError;
 use std::fmt;
 
 pub use draxl_ast as ast;
+pub use draxl_ast::LowerLanguage;
 pub use draxl_merge as merge;
 pub use draxl_parser as parser;
 pub use draxl_patch as patch;
@@ -36,13 +37,15 @@ pub use draxl_validate as validate;
 /// Convenience result type for `draxl` workflows.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Top-level error for parse-and-validate workflows.
+/// Top-level error for public Draxl workflows.
 #[derive(Debug)]
 pub enum Error {
     /// The source could not be parsed into the Draxl AST.
     Parse(parser::ParseError),
     /// The source parsed, but failed structural validation.
     Validation(Vec<validate::ValidationError>),
+    /// Ordinary Rust source could not be imported into Draxl.
+    RustImport(rust::ImportError),
 }
 
 impl Error {
@@ -50,6 +53,7 @@ impl Error {
     pub fn validation_errors(&self) -> Option<&[validate::ValidationError]> {
         match self {
             Self::Validation(errors) => Some(errors),
+            Self::RustImport(error) => error.validation_errors(),
             Self::Parse(_) => None,
         }
     }
@@ -67,6 +71,7 @@ impl fmt::Display for Error {
                 }
                 Ok(())
             }
+            Self::RustImport(error) => error.fmt(f),
         }
     }
 }
@@ -75,6 +80,7 @@ impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
             Self::Parse(error) => Some(error),
+            Self::RustImport(error) => Some(error),
             Self::Validation(_) => None,
         }
     }
@@ -86,9 +92,23 @@ impl From<parser::ParseError> for Error {
     }
 }
 
+impl From<rust::ImportError> for Error {
+    fn from(error: rust::ImportError) -> Self {
+        Self::RustImport(error)
+    }
+}
+
 /// Parses a Draxl source string into the typed AST.
 pub fn parse_file(source: &str) -> std::result::Result<ast::File, parser::ParseError> {
     parser::parse_file(source)
+}
+
+/// Parses a Draxl source string into the typed AST using the selected lower language.
+pub fn parse_file_for_language(
+    language: LowerLanguage,
+    source: &str,
+) -> std::result::Result<ast::File, parser::ParseError> {
+    parser::parse_file_for_language(language, source)
 }
 
 /// Validates a parsed Draxl file.
@@ -103,15 +123,33 @@ pub fn parse_and_validate(source: &str) -> Result<ast::File> {
     Ok(file)
 }
 
+/// Parses and validates a Draxl source string using the selected lower language.
+pub fn parse_and_validate_for_language(language: LowerLanguage, source: &str) -> Result<ast::File> {
+    let file = parse_file_for_language(language, source)?;
+    validate_file(&file).map_err(Error::Validation)?;
+    Ok(file)
+}
+
 /// Canonically formats a parsed Draxl file.
 pub fn format_file(file: &ast::File) -> String {
     printer::print_file(file)
+}
+
+/// Canonically formats a parsed Draxl file using the selected lower language.
+pub fn format_file_for_language(language: LowerLanguage, file: &ast::File) -> String {
+    printer::print_file_for_language(language, file)
 }
 
 /// Parses, validates, and canonically formats a Draxl source string.
 pub fn format_source(source: &str) -> Result<String> {
     let file = parse_and_validate(source)?;
     Ok(format_file(&file))
+}
+
+/// Parses, validates, and canonically formats a Draxl source string using the selected lower language.
+pub fn format_source_for_language(language: LowerLanguage, source: &str) -> Result<String> {
+    let file = parse_and_validate_for_language(language, source)?;
+    Ok(format_file_for_language(language, &file))
 }
 
 /// Emits deterministic JSON for a parsed Draxl file.
@@ -134,6 +172,11 @@ pub fn lower_rust_file(file: &ast::File) -> String {
 pub fn lower_rust_source(source: &str) -> Result<String> {
     let file = parse_and_validate(source)?;
     Ok(lower_rust_file(&file))
+}
+
+/// Imports ordinary Rust source into canonical Draxl Rust-profile source.
+pub fn import_rust_source(source: &str) -> Result<String> {
+    rust::import_source(source).map_err(Error::RustImport)
 }
 
 /// Applies a single structured patch operation.

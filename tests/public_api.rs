@@ -37,6 +37,25 @@ fn facade_lowering_matches_the_golden_output() {
 }
 
 #[test]
+fn facade_imports_rust_source_to_canonical_draxl() {
+    let source = r#"
+mod demo {
+    fn add_one(x: i64) -> i64 {
+        let y = (x + 1);
+        y
+    }
+}
+"#;
+
+    let imported = draxl::import_rust_source(source).expect("supported Rust should import");
+
+    assert_eq!(
+        imported,
+        "@m0001 mod demo {\n  @f0001[r0001] fn add_one(@p0001[r0001] x: @t0001 i64) -> @t0002 i64 {\n    @s0001[r0001] let @pt0001 y = @e0001 (@e0002 x + @l0001 1);\n    @s0002[r0002] @e0003 y\n  }\n}\n\n"
+    );
+}
+
+#[test]
 fn facade_surfaces_validation_errors() {
     let source = r#"
 @m1 mod demo {
@@ -52,6 +71,9 @@ fn facade_surfaces_validation_errors() {
                 .any(|error| error.message.contains("missing `rank`")),
             "expected missing rank validation error, found {errors:?}"
         ),
+        Error::RustImport(error) => {
+            panic!("expected validation error, got rust import error: {error}")
+        }
         Error::Parse(error) => panic!("expected validation error, got parse error: {error}"),
     }
 }
