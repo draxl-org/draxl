@@ -6,5 +6,7 @@ Start here:
 
 - [merge-conflicts.md](merge-conflicts.md): merge-analysis follow-up work
 - [patching.md](patching.md): patch frontend and patch execution follow-up work
+- [python-bootstrap-profile.md](python-bootstrap-profile.md): bootstrap Python
+  profile scope and first core changes
 - [rust-to-draxl-conversion.md](rust-to-draxl-conversion.md): Rust import work
   needed to unlock larger-scale examples and benchmarking
