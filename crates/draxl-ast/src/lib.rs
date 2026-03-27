@@ -14,8 +14,6 @@ mod canonical;
 
 use std::fmt::Write;
 
-pub use canonical::canonicalize_file;
-
 /// Stable identifier attached to an Draxl node.
 pub type NodeId = String;
 
@@ -86,6 +84,11 @@ impl File {
         out.push('\n');
         out
     }
+}
+
+/// Returns a canonicalized clone of the file.
+pub fn canonicalize_file(file: &File) -> File {
+    canonical::canonicalize_file(file)
 }
 
 /// Top-level or module item.

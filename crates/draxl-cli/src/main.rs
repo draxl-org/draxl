@@ -5,9 +5,10 @@
 //! parser, validator, printer, and lowering behavior itself.
 
 use draxl::{
-    apply_patch_text_for_language, check_conflicts_json, dump_json_file, format_file_for_language,
-    format_source_for_language, lower_rust_source, parse_and_validate_for_language,
-    parse_file_for_language, resolve_patch_ops_for_language, validate_file, LowerLanguage,
+    apply_patch_text_for_language, check_conflicts_json_for_language, dump_json_file,
+    format_file_for_language, format_source_for_language, lower_rust_source,
+    lower_source_for_language, parse_and_validate_for_language, parse_file_for_language,
+    resolve_patch_ops_for_language, validate_file, LowerLanguage,
 };
 use std::env;
 use std::fs;
@@ -89,6 +90,16 @@ fn run() -> Result<(), String> {
             );
             Ok(())
         }
+        "lower" => {
+            let path = parse_path_arg(args.next(), "lower")?;
+            let language = detect_lower_language(&path)?;
+            let source = read_source(&path)?;
+            print!(
+                "{}",
+                lower_source_for_language(language, &source).map_err(|err| err.to_string())?
+            );
+            Ok(())
+        }
         "patch" => {
             let first = args.next();
             let (in_place, file_arg, patch_arg) = match first.as_deref() {
@@ -128,7 +139,10 @@ fn run() -> Result<(), String> {
                 .map_err(|err| err.to_string())?;
             let right_ops = resolve_patch_ops_for_language(language, &file, &right_patch)
                 .map_err(|err| err.to_string())?;
-            print!("{}", check_conflicts_json(&file, &left_ops, &right_ops));
+            print!(
+                "{}",
+                check_conflicts_json_for_language(language, &file, &left_ops, &right_ops)
+            );
             Ok(())
         }
         _ => Err(usage()),
@@ -178,6 +192,7 @@ fn usage() -> String {
   draxl fmt [--in-place] <file>
   draxl dump-json <file>
   draxl validate <file>
+  draxl lower <file>
   draxl lower-rust <file>
   draxl patch [--in-place] <file> <patch-file>
   draxl conflicts <file> <left-patch-file> <right-patch-file>"

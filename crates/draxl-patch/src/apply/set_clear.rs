@@ -4,14 +4,15 @@ use crate::schema::{
     clearable_path_spec, find_node_kind, invalid_clear_path_message, invalid_set_path_message,
     path_spec, value_kind_label, ValueKind,
 };
-use draxl_ast::{BinaryOp, Expr, File, Item, Pattern, Stmt, Type, UnaryOp};
+use draxl_ast::{BinaryOp, Expr, File, Item, LowerLanguage, Pattern, Stmt, Type, UnaryOp};
 
 pub(super) fn apply_set(
+    language: LowerLanguage,
     file: &mut File,
     path: PatchPath,
     value: PatchValue,
 ) -> Result<(), PatchError> {
-    let target_kind = find_node_kind(file, &path.node_id).ok_or_else(|| {
+    let target_kind = find_node_kind(language, file, &path.node_id).ok_or_else(|| {
         patch_error(&format!(
             "set target `@{}.{}` was not found",
             path.node_id,
@@ -19,14 +20,15 @@ pub(super) fn apply_set(
         ))
     })?;
     let segment = single_path_segment(&path)?;
-    let spec = path_spec(target_kind, segment).ok_or_else(|| {
+    let spec = path_spec(language, target_kind, segment).ok_or_else(|| {
         patch_error(&invalid_set_path_message(
+            language,
             &path.node_id,
             segment,
             target_kind,
         ))
     })?;
-    expect_value_kind(&value, spec.value_kind, &path.node_id, segment)?;
+    expect_value_kind(language, &value, spec.value_kind, &path.node_id, segment)?;
     if apply_set_in_items(&mut file.items, &path.node_id, &path.segments, &value)? {
         Ok(())
     } else {
@@ -38,8 +40,12 @@ pub(super) fn apply_set(
     }
 }
 
-pub(super) fn apply_clear(file: &mut File, path: PatchPath) -> Result<(), PatchError> {
-    let target_kind = find_node_kind(file, &path.node_id).ok_or_else(|| {
+pub(super) fn apply_clear(
+    language: LowerLanguage,
+    file: &mut File,
+    path: PatchPath,
+) -> Result<(), PatchError> {
+    let target_kind = find_node_kind(language, file, &path.node_id).ok_or_else(|| {
         patch_error(&format!(
             "clear target `@{}.{}` was not found or is not clearable",
             path.node_id,
@@ -47,8 +53,9 @@ pub(super) fn apply_clear(file: &mut File, path: PatchPath) -> Result<(), PatchE
         ))
     })?;
     let segment = single_path_segment(&path)?;
-    clearable_path_spec(target_kind, segment).ok_or_else(|| {
+    clearable_path_spec(language, target_kind, segment).ok_or_else(|| {
         patch_error(&invalid_clear_path_message(
+            language,
             &path.node_id,
             segment,
             target_kind,
@@ -722,6 +729,7 @@ fn single_path_segment(path: &PatchPath) -> Result<&str, PatchError> {
 }
 
 fn expect_value_kind(
+    language: LowerLanguage,
     value: &PatchValue,
     expected: ValueKind,
     node_id: &str,
@@ -733,7 +741,7 @@ fn expect_value_kind(
         | (PatchValue::Bool(_), ValueKind::Bool) => Ok(()),
         _ => Err(patch_error(&format!(
             "path `@{node_id}.{segment}` expects {}",
-            value_kind_label(expected)
+            value_kind_label(language, expected)
         ))),
     }
 }

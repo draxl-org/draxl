@@ -12,7 +12,7 @@ mod model;
 mod schema;
 mod text;
 
-pub use apply::{apply_op, apply_ops};
+pub use apply::{apply_op, apply_op_for_language, apply_ops, apply_ops_for_language};
 pub use error::PatchError;
 pub use model::{
     PatchDest, PatchNode, PatchOp, PatchPath, PatchValue, RankedDest, SlotOwner, SlotRef,

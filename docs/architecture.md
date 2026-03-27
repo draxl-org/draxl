@@ -1,42 +1,57 @@
 # Architecture
 
 Draxl is organized as a small Rust workspace rather than a single crate. The
-split is intentionally along semantic boundaries so the core data model, parser,
-printer, validator, lowering, patching, and CLI can evolve independently.
+split is intentionally along semantic boundaries so the shared data model,
+validation, patch/merge mechanics, language adapters, and CLI can evolve
+independently.
 
-The current implementation is the Rust profile over `.rs.dx` files, but the
-core source model is intended to support multiple language profiles over time.
+The current implementation only supports the Rust lower language over `.rs.dx`
+files, but the workspace now models that support as an explicit
+`LowerLanguage` dispatch boundary rather than as an implicit global default.
 
 ## Data flow
 
 ```text
-                +----------------+
-source .rs.dx -->| draxl-parser   |
-                +----------------+
-                         |
-                         v
-                +----------------+
-                | draxl-ast::File|
-                +----------------+
-                         |
-                         v
-                +----------------+
-                | draxl-validate |
-                +----------------+
-                  |      |      |
-                  |      |      |
-                  v      v      v
-          +-----------+  +--------------+  +------------+
-          | printer   |  | draxl-rust   |  | patch ops  |
-          +-----------+  +--------------+  +------------+
-                  \         |                 /
-                   \        |                /
-                    +------------------------+
-                    |      draxl facade      |
-                    +------------------------+
-                               |
-                               v
-                         draxl CLI / users
+source .rs.dx
+     |
+     v
++---------------------------+
+| draxl-parser              |
+| dispatch by LowerLanguage |
++---------------------------+
+     |
+     v
++------------------+
+| draxl-rust parse |
++------------------+
+     |
+     v
++------------------+
+| draxl-ast::File  |
++------------------+
+     |
+     v
++------------------+
+| draxl-validate   |
++------------------+
+  |        |        |         |
+  |        |        |         |
+  v        v        v         v
+printer  lowering  patch    merge
+dispatch adapter   dispatch dispatch
+  |        |        |         |
+  v        v        v         v
+draxl-   draxl-   draxl-    draxl-
+rust     rust     rust      rust
+render            schema    semantics
+  \        |        |         /
+   \       |        |        /
+    +----------------------+
+    |    draxl facade      |
+    +----------------------+
+               |
+               v
+         draxl CLI / users
 ```
 
 ## Crates
@@ -65,18 +80,21 @@ The AST crate defines the typed IR and shared metadata:
 - optional rank and anchor metadata
 - slot names for ordered children
 - typed items, statements, expressions, patterns, and types
+- the `LowerLanguage` dispatch key used by higher layers
+- canonical ordering of the shared tree for stable comparison and printing
 
 This crate has no parser, validation, or rendering policy. It is the shared
 data model for the rest of the workspace.
 
 ### `draxl-parser`
 
-The parser crate owns the surface syntax front end:
+The parser crate is now a thin dispatch facade:
 
-- lexing sigil metadata such as `@f1[a]->x2`
-- parsing the bootstrap Rust profile
-- attaching metadata to typed AST nodes
-- producing structured parse errors with spans and line/column locations
+- accepts an explicit `LowerLanguage`
+- routes whole-file and fragment parsing to the selected adapter
+- keeps Rust-default compatibility wrappers for existing callers
+
+The actual Rust parsing implementation lives in `draxl-rust`.
 
 ### `draxl-validate`
 
@@ -93,26 +111,32 @@ and syntax-focused.
 
 ### `draxl-printer`
 
-The printer has two jobs:
+The printer crate is also a dispatch facade:
 
-- canonicalize ordered children and comment/doc placement
-- render the AST back into canonical Draxl source
+- accepts an explicit `LowerLanguage`
+- routes rendering to the selected adapter
+- re-exports shared canonicalization from `draxl-ast`
 
 Stable formatting is one of the core repository claims, so canonicalization and
 rendering stay separate.
 
 ### `draxl-rust`
 
-This crate owns Rust-profile support. Today that surface is primarily lowering:
-it lowers validated Draxl into ordinary Rust source for the currently supported
-subset and strips Draxl metadata while preserving the semantic shape
-represented by the AST.
+This crate owns the Rust language adapter:
+
+- parse `.rs.dx` files and fragments
+- render canonical `.rs.dx`
+- lower to ordinary Rust
+- import ordinary Rust into the Draxl IR
+- define Rust patch schema and slot/path rules
+- define Rust semantic merge analysis
 
 ### `draxl-patch`
 
 The patch crate applies structured edit operators over the AST:
 
 - parse and resolve canonical textual patch streams
+- dispatch fragment parsing and schema checks by `LowerLanguage`
 - insert into ranked slots
 - put into single-child slots
 - replace node bodies while preserving outer identity
@@ -121,7 +145,17 @@ The patch crate applies structured edit operators over the AST:
 - set and clear scalar fields
 
 The patch model is deliberately semantic, slot-aware, and attachment-aware. It
-provides a structured tree edit layer over the AST.
+provides a structured tree edit layer over the AST while keeping
+Rust-default compatibility wrappers for callers that do not pass a language.
+
+### `draxl-merge`
+
+The merge crate owns conflict detection over patch streams:
+
+- hard-conflict detection over structured patch ops
+- replay-based convergence checks
+- semantic conflict extraction dispatched by `LowerLanguage`
+- structured conflict reports for humans and agents
 
 ### `draxl-cli`
 
@@ -132,8 +166,14 @@ workflows exposed to users:
 - `fmt`
 - `dump-json`
 - `validate`
+- `lower`
 - `lower-rust`
 - `patch`
+- `conflicts`
+
+For commands that operate on Draxl source files, the CLI infers `LowerLanguage`
+from the source file extension such as `.rs.dx`. The Rust library API keeps the
+language explicit instead of relying on file names.
 
 ## Design choices
 
@@ -152,6 +192,13 @@ of nearby code.
 The parse phase accepts the supported syntax. The validate phase decides whether
 the resulting tree satisfies the stronger semantic invariants that make
 canonical printing and patching predictable.
+
+### Language dispatch stays explicit at the API boundary
+
+Library callers can choose a `LowerLanguage` directly. The CLI performs file
+extension detection and then calls those explicit APIs. Compatibility wrappers
+still default to Rust so existing callers keep working while the adapter split
+stays visible in the architecture.
 
 ### The root crate is the API boundary
 

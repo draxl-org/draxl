@@ -1,4 +1,3 @@
-use crate::context::TreeContext;
 use crate::explain::{
     binding_rename_vs_initializer_change_conflict, non_convergent_replay_conflict,
     parameter_type_vs_body_interpretation_change_conflict, replay_failure_conflict,
@@ -6,28 +5,51 @@ use crate::explain::{
     same_single_slot_write_conflict,
 };
 use crate::model::{Conflict, ConflictReport, ReplayFailure, ReplayOrder, ReplayStage};
-use crate::semantic::{extract_semantic_changes, SemanticChange, SemanticOwner, SemanticRegion};
-use draxl_ast::File;
-use draxl_patch::{apply_op, PatchDest, PatchOp, RankedDest, SlotRef};
+use crate::semantic::{
+    extract_semantic_changes_for_language, SemanticChange, SemanticOwner, SemanticRegion,
+};
+use draxl_ast::{File, LowerLanguage};
+use draxl_patch::{apply_op_for_language, PatchDest, PatchOp, RankedDest, SlotRef};
 use draxl_printer::canonicalize_file;
 use draxl_validate::validate_file;
 
 /// Checks both hard and semantic conflicts against the same base.
 pub fn check_conflicts(base: &File, left: &[PatchOp], right: &[PatchOp]) -> ConflictReport {
-    let hard = check_hard_conflicts(base, left, right);
+    check_conflicts_for_language(LowerLanguage::Rust, base, left, right)
+}
+
+/// Checks both hard and semantic conflicts against the same base using the selected lower language.
+pub fn check_conflicts_for_language(
+    language: LowerLanguage,
+    base: &File,
+    left: &[PatchOp],
+    right: &[PatchOp],
+) -> ConflictReport {
+    let hard = check_hard_conflicts_for_language(language, base, left, right);
     if hard.has_conflicts() {
         return hard;
     }
 
     ConflictReport {
-        conflicts: classify_semantic_conflicts(base, left, right),
+        conflicts: classify_semantic_conflicts(language, base, left, right),
     }
 }
 
 /// Checks whether two patch streams have hard conflicts against the same base.
 pub fn check_hard_conflicts(base: &File, left: &[PatchOp], right: &[PatchOp]) -> ConflictReport {
-    let left_then_right = replay(base, ReplayOrder::LeftThenRight, left, right);
-    let right_then_left = replay(base, ReplayOrder::RightThenLeft, right, left);
+    check_hard_conflicts_for_language(LowerLanguage::Rust, base, left, right)
+}
+
+/// Checks whether two patch streams have hard conflicts against the same base using the selected
+/// lower language.
+pub fn check_hard_conflicts_for_language(
+    language: LowerLanguage,
+    base: &File,
+    left: &[PatchOp],
+    right: &[PatchOp],
+) -> ConflictReport {
+    let left_then_right = replay(language, base, ReplayOrder::LeftThenRight, left, right);
+    let right_then_left = replay(language, base, ReplayOrder::RightThenLeft, right, left);
 
     if let (Ok(left_then_right), Ok(right_then_left)) = (&left_then_right, &right_then_left) {
         if canonicalize_file(left_then_right).without_spans()
@@ -111,10 +133,14 @@ fn classify_pairwise_conflicts(left: &[PatchOp], right: &[PatchOp]) -> Vec<Confl
     conflicts
 }
 
-fn classify_semantic_conflicts(base: &File, left: &[PatchOp], right: &[PatchOp]) -> Vec<Conflict> {
-    let context = TreeContext::build(base);
-    let left_changes = extract_semantic_changes(left, &context);
-    let right_changes = extract_semantic_changes(right, &context);
+fn classify_semantic_conflicts(
+    language: LowerLanguage,
+    base: &File,
+    left: &[PatchOp],
+    right: &[PatchOp],
+) -> Vec<Conflict> {
+    let left_changes = extract_semantic_changes_for_language(language, base, left);
+    let right_changes = extract_semantic_changes_for_language(language, base, right);
     let mut conflicts = Vec::new();
 
     for left_change in &left_changes {
@@ -196,14 +222,15 @@ fn semantic_conflict_for_pair(
 }
 
 fn replay(
+    language: LowerLanguage,
     base: &File,
     order: ReplayOrder,
     first: &[PatchOp],
     second: &[PatchOp],
 ) -> Result<File, ReplayFailure> {
     let mut file = base.clone();
-    apply_sequence(&mut file, order, first, first_stage)?;
-    apply_sequence(&mut file, order, second, second_stage)?;
+    apply_sequence(language, &mut file, order, first, first_stage)?;
+    apply_sequence(language, &mut file, order, second, second_stage)?;
     validate_file(&file).map_err(|errors| ReplayFailure {
         order,
         stage: ReplayStage::Validation,
@@ -213,13 +240,14 @@ fn replay(
 }
 
 fn apply_sequence(
+    language: LowerLanguage,
     file: &mut File,
     order: ReplayOrder,
     ops: &[PatchOp],
     stage_for_index: impl Fn(usize) -> ReplayStage,
 ) -> Result<(), ReplayFailure> {
     for (index, op) in ops.iter().cloned().enumerate() {
-        apply_op(file, op).map_err(|error| ReplayFailure {
+        apply_op_for_language(language, file, op).map_err(|error| ReplayFailure {
             order,
             stage: stage_for_index(index),
             message: error.to_string(),

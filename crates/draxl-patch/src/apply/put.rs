@@ -5,9 +5,14 @@ use super::support::{
 use crate::error::{patch_error, PatchError};
 use crate::model::{PatchNode, SlotOwner, SlotRef};
 use crate::schema::{expr_kind, invalid_single_slot_message, item_kind, single_slot_spec};
-use draxl_ast::{Block, Expr, File, Item, MatchArm, Stmt};
+use draxl_ast::{Block, Expr, File, Item, LowerLanguage, MatchArm, Stmt};
 
-pub(super) fn apply_put(file: &mut File, slot: SlotRef, node: PatchNode) -> Result<(), PatchError> {
+pub(super) fn apply_put(
+    language: LowerLanguage,
+    file: &mut File,
+    slot: SlotRef,
+    node: PatchNode,
+) -> Result<(), PatchError> {
     require_put_fragment(&node)?;
 
     let mut node = Some(node);
@@ -18,7 +23,7 @@ pub(super) fn apply_put(file: &mut File, slot: SlotRef, node: PatchNode) -> Resu
         SlotOwner::Node(id) => {
             let mut found = false;
             for item in &mut file.items {
-                if put_in_item(item, id, &slot.slot, &mut node)? {
+                if put_in_item(language, item, id, &slot.slot, &mut node)? {
                     found = true;
                     break;
                 }
@@ -38,18 +43,22 @@ pub(super) fn apply_put(file: &mut File, slot: SlotRef, node: PatchNode) -> Resu
 }
 
 fn put_in_item(
+    language: LowerLanguage,
     item: &mut Item,
     owner_id: &str,
     public_slot: &str,
     node: &mut Option<PatchNode>,
 ) -> Result<bool, PatchError> {
     if item.meta().id == owner_id {
-        let spec = single_slot_spec(item_kind(item), public_slot).ok_or_else(|| {
-            patch_error(&invalid_single_slot_message(
-                &format!("@{owner_id}"),
-                public_slot,
-            ))
-        })?;
+        let spec = single_slot_spec(language, item_kind(language, item), public_slot).ok_or_else(
+            || {
+                patch_error(&invalid_single_slot_message(
+                    language,
+                    &format!("@{owner_id}"),
+                    public_slot,
+                ))
+            },
+        )?;
         match item {
             Item::Fn(function) => {
                 let mut ty = expect_type(node.take(), spec.public_name)?;
@@ -65,7 +74,7 @@ fn put_in_item(
     match item {
         Item::Mod(module) => {
             for child in &mut module.items {
-                if put_in_item(child, owner_id, public_slot, node)? {
+                if put_in_item(language, child, owner_id, public_slot, node)? {
                     return Ok(true);
                 }
             }
@@ -73,13 +82,15 @@ fn put_in_item(
         Item::Struct(strukt) => {
             for field in &mut strukt.fields {
                 if field.meta.id == owner_id {
-                    let spec = single_slot_spec(crate::schema::NodeKind::Field, public_slot)
-                        .ok_or_else(|| {
-                            patch_error(&invalid_single_slot_message(
-                                &format!("@{owner_id}"),
-                                public_slot,
-                            ))
-                        })?;
+                    let spec =
+                        single_slot_spec(language, crate::schema::NodeKind::Field, public_slot)
+                            .ok_or_else(|| {
+                                patch_error(&invalid_single_slot_message(
+                                    language,
+                                    &format!("@{owner_id}"),
+                                    public_slot,
+                                ))
+                            })?;
                     let mut ty = expect_type(node.take(), spec.public_name)?;
                     assign_type_slot_and_rank(&mut ty, spec.meta_slot_name, None, true);
                     field.ty = ty;
@@ -90,13 +101,15 @@ fn put_in_item(
         Item::Fn(function) => {
             for param in &mut function.params {
                 if param.meta.id == owner_id {
-                    let spec = single_slot_spec(crate::schema::NodeKind::Param, public_slot)
-                        .ok_or_else(|| {
-                            patch_error(&invalid_single_slot_message(
-                                &format!("@{owner_id}"),
-                                public_slot,
-                            ))
-                        })?;
+                    let spec =
+                        single_slot_spec(language, crate::schema::NodeKind::Param, public_slot)
+                            .ok_or_else(|| {
+                                patch_error(&invalid_single_slot_message(
+                                    language,
+                                    &format!("@{owner_id}"),
+                                    public_slot,
+                                ))
+                            })?;
                     let mut ty = expect_type(node.take(), spec.public_name)?;
                     assign_type_slot_and_rank(&mut ty, spec.meta_slot_name, None, true);
                     param.ty = ty;
@@ -110,7 +123,7 @@ fn put_in_item(
                     ));
                 }
             }
-            if put_in_block(&mut function.body, owner_id, public_slot, node)? {
+            if put_in_block(language, &mut function.body, owner_id, public_slot, node)? {
                 return Ok(true);
             }
         }
@@ -121,13 +134,14 @@ fn put_in_item(
 }
 
 fn put_in_block(
+    language: LowerLanguage,
     block: &mut Block,
     owner_id: &str,
     public_slot: &str,
     node: &mut Option<PatchNode>,
 ) -> Result<bool, PatchError> {
     for stmt in &mut block.stmts {
-        if put_in_stmt(stmt, owner_id, public_slot, node)? {
+        if put_in_stmt(language, stmt, owner_id, public_slot, node)? {
             return Ok(true);
         }
     }
@@ -135,19 +149,25 @@ fn put_in_block(
 }
 
 fn put_in_stmt(
+    language: LowerLanguage,
     stmt: &mut Stmt,
     owner_id: &str,
     public_slot: &str,
     node: &mut Option<PatchNode>,
 ) -> Result<bool, PatchError> {
     if super::support::stmt_id(stmt).is_some_and(|id| id == owner_id) {
-        let spec =
-            single_slot_spec(crate::schema::stmt_kind(stmt), public_slot).ok_or_else(|| {
-                patch_error(&invalid_single_slot_message(
-                    &format!("@{owner_id}"),
-                    public_slot,
-                ))
-            })?;
+        let spec = single_slot_spec(
+            language,
+            crate::schema::stmt_kind(language, stmt),
+            public_slot,
+        )
+        .ok_or_else(|| {
+            patch_error(&invalid_single_slot_message(
+                language,
+                &format!("@{owner_id}"),
+                public_slot,
+            ))
+        })?;
         match stmt {
             Stmt::Let(let_stmt) => match spec.fragment_kind {
                 crate::schema::FragmentKind::Pattern => {
@@ -175,26 +195,34 @@ fn put_in_stmt(
     }
 
     match stmt {
-        Stmt::Let(let_stmt) => put_in_expr(&mut let_stmt.value, owner_id, public_slot, node),
-        Stmt::Expr(expr_stmt) => put_in_expr(&mut expr_stmt.expr, owner_id, public_slot, node),
-        Stmt::Item(item) => put_in_item(item, owner_id, public_slot, node),
+        Stmt::Let(let_stmt) => {
+            put_in_expr(language, &mut let_stmt.value, owner_id, public_slot, node)
+        }
+        Stmt::Expr(expr_stmt) => {
+            put_in_expr(language, &mut expr_stmt.expr, owner_id, public_slot, node)
+        }
+        Stmt::Item(item) => put_in_item(language, item, owner_id, public_slot, node),
         Stmt::Doc(_) | Stmt::Comment(_) => Ok(false),
     }
 }
 
 fn put_in_expr(
+    language: LowerLanguage,
     expr: &mut Expr,
     owner_id: &str,
     public_slot: &str,
     node: &mut Option<PatchNode>,
 ) -> Result<bool, PatchError> {
     if super::support::expr_id(expr).is_some_and(|id| id == owner_id) {
-        let spec = single_slot_spec(expr_kind(expr), public_slot).ok_or_else(|| {
-            patch_error(&invalid_single_slot_message(
-                &format!("@{owner_id}"),
-                public_slot,
-            ))
-        })?;
+        let spec = single_slot_spec(language, expr_kind(language, expr), public_slot).ok_or_else(
+            || {
+                patch_error(&invalid_single_slot_message(
+                    language,
+                    &format!("@{owner_id}"),
+                    public_slot,
+                ))
+            },
+        )?;
         match expr {
             Expr::Group(group) => {
                 let mut inner = expect_expr(node.take(), spec.public_name)?;
@@ -235,51 +263,59 @@ fn put_in_expr(
     }
 
     match expr {
-        Expr::Group(group) => put_in_expr(&mut group.expr, owner_id, public_slot, node),
+        Expr::Group(group) => put_in_expr(language, &mut group.expr, owner_id, public_slot, node),
         Expr::Binary(binary) => {
-            if put_in_expr(&mut binary.lhs, owner_id, public_slot, node)? {
+            if put_in_expr(language, &mut binary.lhs, owner_id, public_slot, node)? {
                 return Ok(true);
             }
-            put_in_expr(&mut binary.rhs, owner_id, public_slot, node)
+            put_in_expr(language, &mut binary.rhs, owner_id, public_slot, node)
         }
-        Expr::Unary(unary) => put_in_expr(&mut unary.expr, owner_id, public_slot, node),
+        Expr::Unary(unary) => put_in_expr(language, &mut unary.expr, owner_id, public_slot, node),
         Expr::Call(call) => {
-            if put_in_expr(&mut call.callee, owner_id, public_slot, node)? {
+            if put_in_expr(language, &mut call.callee, owner_id, public_slot, node)? {
                 return Ok(true);
             }
             for arg in &mut call.args {
-                if put_in_expr(arg, owner_id, public_slot, node)? {
+                if put_in_expr(language, arg, owner_id, public_slot, node)? {
                     return Ok(true);
                 }
             }
             Ok(false)
         }
         Expr::Match(match_expr) => {
-            if put_in_expr(&mut match_expr.scrutinee, owner_id, public_slot, node)? {
+            if put_in_expr(
+                language,
+                &mut match_expr.scrutinee,
+                owner_id,
+                public_slot,
+                node,
+            )? {
                 return Ok(true);
             }
             for arm in &mut match_expr.arms {
-                if put_in_match_arm(arm, owner_id, public_slot, node)? {
+                if put_in_match_arm(language, arm, owner_id, public_slot, node)? {
                     return Ok(true);
                 }
             }
             Ok(false)
         }
-        Expr::Block(block) => put_in_block(block, owner_id, public_slot, node),
+        Expr::Block(block) => put_in_block(language, block, owner_id, public_slot, node),
         Expr::Path(_) | Expr::Lit(_) => Ok(false),
     }
 }
 
 fn put_in_match_arm(
+    language: LowerLanguage,
     arm: &mut MatchArm,
     owner_id: &str,
     public_slot: &str,
     node: &mut Option<PatchNode>,
 ) -> Result<bool, PatchError> {
     if arm.meta.id == owner_id {
-        let spec =
-            single_slot_spec(crate::schema::NodeKind::MatchArm, public_slot).ok_or_else(|| {
+        let spec = single_slot_spec(language, crate::schema::NodeKind::MatchArm, public_slot)
+            .ok_or_else(|| {
                 patch_error(&invalid_single_slot_message(
+                    language,
                     &format!("@{owner_id}"),
                     public_slot,
                 ))
@@ -308,11 +344,11 @@ fn put_in_match_arm(
     }
 
     if let Some(guard) = &mut arm.guard {
-        if put_in_expr(guard, owner_id, public_slot, node)? {
+        if put_in_expr(language, guard, owner_id, public_slot, node)? {
             return Ok(true);
         }
     }
-    if put_in_expr(&mut arm.body, owner_id, public_slot, node)? {
+    if put_in_expr(language, &mut arm.body, owner_id, public_slot, node)? {
         return Ok(true);
     }
     Ok(false)

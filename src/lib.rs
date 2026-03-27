@@ -164,13 +164,25 @@ pub fn dump_json_source(source: &str) -> Result<String> {
 
 /// Lowers a validated Draxl file to ordinary Rust source.
 pub fn lower_rust_file(file: &ast::File) -> String {
-    lower_rust::lower_file(file)
+    lower_file_for_language(LowerLanguage::Rust, file)
+}
+
+/// Lowers a validated Draxl file using the selected lower language.
+pub fn lower_file_for_language(language: LowerLanguage, file: &ast::File) -> String {
+    match language {
+        LowerLanguage::Rust => lower_rust::lower_file(file),
+    }
 }
 
 /// Parses, validates, and lowers Draxl source to ordinary Rust.
 pub fn lower_rust_source(source: &str) -> Result<String> {
-    let file = parse_and_validate(source)?;
-    Ok(lower_rust_file(&file))
+    lower_source_for_language(LowerLanguage::Rust, source)
+}
+
+/// Parses, validates, and lowers Draxl source using the selected lower language.
+pub fn lower_source_for_language(language: LowerLanguage, source: &str) -> Result<String> {
+    let file = parse_and_validate_for_language(language, source)?;
+    Ok(lower_file_for_language(language, &file))
 }
 
 /// Imports ordinary Rust source into canonical Draxl Rust-profile source.
@@ -186,7 +198,16 @@ pub fn apply_patch(
     file: &mut ast::File,
     op: patch::PatchOp,
 ) -> std::result::Result<(), patch::PatchError> {
-    patch::apply_op(file, op)
+    apply_patch_for_language(LowerLanguage::Rust, file, op)
+}
+
+/// Applies a single structured patch operation using the selected lower language.
+pub fn apply_patch_for_language(
+    language: LowerLanguage,
+    file: &mut ast::File,
+    op: patch::PatchOp,
+) -> std::result::Result<(), patch::PatchError> {
+    patch::apply_op_for_language(language, file, op)
 }
 
 /// Applies multiple structured patch operations in order.
@@ -194,7 +215,16 @@ pub fn apply_patches(
     file: &mut ast::File,
     ops: impl IntoIterator<Item = patch::PatchOp>,
 ) -> std::result::Result<(), patch::PatchError> {
-    patch::apply_ops(file, ops)
+    apply_patches_for_language(LowerLanguage::Rust, file, ops)
+}
+
+/// Applies multiple structured patch operations in order using the selected lower language.
+pub fn apply_patches_for_language(
+    language: LowerLanguage,
+    file: &mut ast::File,
+    ops: impl IntoIterator<Item = patch::PatchOp>,
+) -> std::result::Result<(), patch::PatchError> {
+    patch::apply_ops_for_language(language, file, ops)
 }
 
 /// Parses canonical textual patch ops into unresolved surface ops.
@@ -244,7 +274,18 @@ pub fn check_hard_conflicts(
     left: &[patch::PatchOp],
     right: &[patch::PatchOp],
 ) -> merge::HardConflictReport {
-    merge::check_hard_conflicts(base, left, right)
+    check_hard_conflicts_for_language(LowerLanguage::Rust, base, left, right)
+}
+
+/// Checks whether two patch streams have hard conflicts against the same base using the selected
+/// lower language.
+pub fn check_hard_conflicts_for_language(
+    language: LowerLanguage,
+    base: &ast::File,
+    left: &[patch::PatchOp],
+    right: &[patch::PatchOp],
+) -> merge::HardConflictReport {
+    merge::check_hard_conflicts_for_language(language, base, left, right)
 }
 
 /// Checks whether two patch streams have hard conflicts and emits JSON.
@@ -253,7 +294,17 @@ pub fn check_hard_conflicts_json(
     left: &[patch::PatchOp],
     right: &[patch::PatchOp],
 ) -> String {
-    check_hard_conflicts(base, left, right).to_json_pretty()
+    check_hard_conflicts_json_for_language(LowerLanguage::Rust, base, left, right)
+}
+
+/// Checks whether two patch streams have hard conflicts and emits JSON using the selected lower language.
+pub fn check_hard_conflicts_json_for_language(
+    language: LowerLanguage,
+    base: &ast::File,
+    left: &[patch::PatchOp],
+    right: &[patch::PatchOp],
+) -> String {
+    check_hard_conflicts_for_language(language, base, left, right).to_json_pretty()
 }
 
 /// Checks both hard and semantic conflicts against the same base.
@@ -262,7 +313,17 @@ pub fn check_conflicts(
     left: &[patch::PatchOp],
     right: &[patch::PatchOp],
 ) -> merge::ConflictReport {
-    merge::check_conflicts(base, left, right)
+    check_conflicts_for_language(LowerLanguage::Rust, base, left, right)
+}
+
+/// Checks both hard and semantic conflicts against the same base using the selected lower language.
+pub fn check_conflicts_for_language(
+    language: LowerLanguage,
+    base: &ast::File,
+    left: &[patch::PatchOp],
+    right: &[patch::PatchOp],
+) -> merge::ConflictReport {
+    merge::check_conflicts_for_language(language, base, left, right)
 }
 
 /// Checks both hard and semantic conflicts and emits JSON.
@@ -271,5 +332,15 @@ pub fn check_conflicts_json(
     left: &[patch::PatchOp],
     right: &[patch::PatchOp],
 ) -> String {
-    check_conflicts(base, left, right).to_json_pretty()
+    check_conflicts_json_for_language(LowerLanguage::Rust, base, left, right)
+}
+
+/// Checks both hard and semantic conflicts and emits JSON using the selected lower language.
+pub fn check_conflicts_json_for_language(
+    language: LowerLanguage,
+    base: &ast::File,
+    left: &[patch::PatchOp],
+    right: &[patch::PatchOp],
+) -> String {
+    check_conflicts_for_language(language, base, left, right).to_json_pretty()
 }

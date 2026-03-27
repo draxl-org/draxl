@@ -1,5 +1,6 @@
 use crate::context::TreeContext;
 use crate::model::{ConflictOwner, ConflictRegion};
+use draxl_ast::{File, LowerLanguage};
 use draxl_patch::{PatchDest, PatchNode, PatchOp, PatchValue, SlotOwner, SlotRef};
 use draxl_rust::{
     extract_semantic_changes as extract_rust_semantic_changes, SemanticOp, SemanticPatchNode,
@@ -44,6 +45,16 @@ pub(crate) fn extract_semantic_changes(
 ) -> Vec<SemanticChange> {
     let semantic_ops = ops.iter().map(translate_op).collect::<Vec<_>>();
     extract_rust_semantic_changes(&semantic_ops, context)
+}
+
+pub(crate) fn extract_semantic_changes_for_language(
+    language: LowerLanguage,
+    base: &File,
+    ops: &[PatchOp],
+) -> Vec<SemanticChange> {
+    match language {
+        LowerLanguage::Rust => extract_semantic_changes(ops, &TreeContext::build(base)),
+    }
 }
 
 fn translate_op(op: &PatchOp) -> SemanticOp {

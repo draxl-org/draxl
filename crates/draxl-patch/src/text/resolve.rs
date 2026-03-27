@@ -28,7 +28,7 @@ pub(super) fn resolve_patch_ops(
     let mut resolved = Vec::with_capacity(surface_ops.len());
     for surface_op in surface_ops {
         let op = resolve_op(language, &working, source, surface_op)?;
-        crate::apply_op(&mut working, op.op.clone())
+        crate::apply_op_for_language(language, &mut working, op.op.clone())
             .map_err(|err| patch_text_error(source, surface_op.span(), &err.message))?;
         resolved.push(op);
     }
@@ -44,9 +44,9 @@ pub(super) fn resolve_op(
     let span = surface_op.span();
     let op = match surface_op {
         SurfacePatchOp::Insert { dest, fragment, .. } => {
-            let resolved_dest = resolve_ranked_dest(file, source, dest)?;
-            let owner_kind = dest_owner_kind(file, source, &dest.slot.owner)?;
-            let fragment_kind = ranked_slot_spec(owner_kind, &dest.slot.slot)
+            let resolved_dest = resolve_ranked_dest(language, file, source, dest)?;
+            let owner_kind = dest_owner_kind(language, file, source, &dest.slot.owner)?;
+            let fragment_kind = ranked_slot_spec(language, owner_kind, &dest.slot.slot)
                 .map(|spec| spec.fragment_kind)
                 .expect("ranked destination fragment kind must already be validated before use");
             PatchOp::Insert {
@@ -55,67 +55,71 @@ pub(super) fn resolve_op(
             }
         }
         SurfacePatchOp::Put { slot, fragment, .. } => {
-            let owner_kind = dest_owner_kind(file, source, &slot.owner)?;
-            let fragment_kind = single_slot_spec(owner_kind, &slot.slot)
+            let owner_kind = dest_owner_kind(language, file, source, &slot.owner)?;
+            let fragment_kind = single_slot_spec(language, owner_kind, &slot.slot)
                 .map(|spec| spec.fragment_kind)
                 .ok_or_else(|| {
                     patch_text_error(
                         source,
                         slot.slot_span,
-                        &invalid_single_slot_message(&owner_label(&slot.owner), &slot.slot),
+                        &invalid_single_slot_message(
+                            language,
+                            &owner_label(&slot.owner),
+                            &slot.slot,
+                        ),
                     )
                 })?;
             PatchOp::Put {
-                slot: resolve_slot_ref(file, source, slot)?,
+                slot: resolve_slot_ref(language, file, source, slot)?,
                 node: parse_fragment(language, source, fragment, fragment_kind)?,
             }
         }
         SurfacePatchOp::Replace {
             target, fragment, ..
         } => {
-            let target_kind = resolve_node_kind(file, source, target)?;
+            let target_kind = resolve_node_kind(language, file, source, target)?;
             PatchOp::Replace {
                 target_id: target.id.clone(),
                 replacement: parse_fragment(
                     language,
                     source,
                     fragment,
-                    replace_fragment_kind(target_kind),
+                    replace_fragment_kind(language, target_kind),
                 )?,
             }
         }
         SurfacePatchOp::Delete { target, .. } => PatchOp::Delete {
-            target_id: ensure_node_exists(file, source, target)?.id,
+            target_id: ensure_node_exists(language, file, source, target)?.id,
         },
         SurfacePatchOp::Move { target, dest, .. } => PatchOp::Move {
-            target_id: ensure_node_exists(file, source, target)?.id,
-            dest: resolve_move_dest(file, source, dest)?,
+            target_id: ensure_node_exists(language, file, source, target)?.id,
+            dest: resolve_move_dest(language, file, source, dest)?,
         },
         SurfacePatchOp::Set { path, value, .. } => PatchOp::Set {
-            path: resolve_path(file, source, path)?,
-            value: resolve_value(file, source, path, value)?,
+            path: resolve_path(language, file, source, path)?,
+            value: resolve_value(language, file, source, path, value)?,
         },
         SurfacePatchOp::Clear { path, .. } => {
-            let node_kind = resolve_node_kind(file, source, &path.node)?;
+            let node_kind = resolve_node_kind(language, file, source, &path.node)?;
             ensure_single_segment_path(source, path)?;
             let segment = &path.segments[0];
-            if clearable_path_spec(node_kind, &segment.name).is_none() {
+            if clearable_path_spec(language, node_kind, &segment.name).is_none() {
                 return Err(patch_text_error(
                     source,
                     segment.span,
-                    &invalid_clear_path_message(&path.node.id, &segment.name, node_kind),
+                    &invalid_clear_path_message(language, &path.node.id, &segment.name, node_kind),
                 ));
             }
             PatchOp::Clear {
-                path: resolve_path(file, source, path)?,
+                path: resolve_path(language, file, source, path)?,
             }
         }
         SurfacePatchOp::Attach { node, target, .. } => PatchOp::Attach {
-            node_id: ensure_node_exists(file, source, node)?.id,
-            target_id: ensure_node_exists(file, source, target)?.id,
+            node_id: ensure_node_exists(language, file, source, node)?.id,
+            target_id: ensure_node_exists(language, file, source, target)?.id,
         },
         SurfacePatchOp::Detach { node, .. } => PatchOp::Detach {
-            node_id: ensure_node_exists(file, source, node)?.id,
+            node_id: ensure_node_exists(language, file, source, node)?.id,
         },
     };
 
@@ -123,17 +127,18 @@ pub(super) fn resolve_op(
 }
 
 fn resolve_move_dest(
+    language: LowerLanguage,
     file: &File,
     source: &str,
     dest: &SurfaceDest,
 ) -> Result<PatchDest, PatchTextError> {
     match dest {
-        SurfaceDest::Ranked(dest) => {
-            Ok(PatchDest::Ranked(resolve_ranked_dest(file, source, dest)?))
-        }
+        SurfaceDest::Ranked(dest) => Ok(PatchDest::Ranked(resolve_ranked_dest(
+            language, file, source, dest,
+        )?)),
         SurfaceDest::Slot(slot) => {
-            let owner_kind = dest_owner_kind(file, source, &slot.owner)?;
-            if single_slot_spec(owner_kind, &slot.slot).is_none() {
+            let owner_kind = dest_owner_kind(language, file, source, &slot.owner)?;
+            if single_slot_spec(language, owner_kind, &slot.slot).is_none() {
                 return Err(patch_text_error(
                     source,
                     slot.slot_span,
@@ -141,35 +146,39 @@ fn resolve_move_dest(
                         "slot `{}.{}` is not a single-child move destination on {}",
                         owner_label(&slot.owner),
                         slot.slot,
-                        node_kind_label(owner_kind)
+                        node_kind_label(language, owner_kind)
                     ),
                 ));
             }
-            Ok(PatchDest::Slot(resolve_slot_ref(file, source, slot)?))
+            Ok(PatchDest::Slot(resolve_slot_ref(
+                language, file, source, slot,
+            )?))
         }
     }
 }
 
 fn resolve_ranked_dest(
+    language: LowerLanguage,
     file: &File,
     source: &str,
     dest: &SurfaceRankedDest,
 ) -> Result<RankedDest, PatchTextError> {
-    let owner_kind = dest_owner_kind(file, source, &dest.slot.owner)?;
-    if ranked_slot_spec(owner_kind, &dest.slot.slot).is_none() {
+    let owner_kind = dest_owner_kind(language, file, source, &dest.slot.owner)?;
+    if ranked_slot_spec(language, owner_kind, &dest.slot.slot).is_none() {
         return Err(patch_text_error(
             source,
             dest.slot.slot_span,
-            &invalid_ranked_slot_message(&owner_label(&dest.slot.owner), &dest.slot.slot),
+            &invalid_ranked_slot_message(language, &owner_label(&dest.slot.owner), &dest.slot.slot),
         ));
     }
     Ok(RankedDest {
-        slot: resolve_slot_ref(file, source, &dest.slot)?,
+        slot: resolve_slot_ref(language, file, source, &dest.slot)?,
         rank: dest.rank.clone(),
     })
 }
 
 fn resolve_slot_ref(
+    language: LowerLanguage,
     file: &File,
     source: &str,
     slot: &SurfaceSlotRef,
@@ -178,7 +187,7 @@ fn resolve_slot_ref(
         owner: match &slot.owner {
             SurfaceSlotOwner::File { .. } => SlotOwner::File,
             SurfaceSlotOwner::Node(node) => {
-                ensure_node_exists(file, source, node)?;
+                ensure_node_exists(language, file, source, node)?;
                 SlotOwner::Node(node.id.clone())
             }
         },
@@ -187,12 +196,13 @@ fn resolve_slot_ref(
 }
 
 fn resolve_path(
+    language: LowerLanguage,
     file: &File,
     source: &str,
     path: &SurfacePath,
 ) -> Result<PatchPath, PatchTextError> {
     ensure_single_segment_path(source, path)?;
-    ensure_node_exists(file, source, &path.node)?;
+    ensure_node_exists(language, file, source, &path.node)?;
     Ok(PatchPath {
         node_id: path.node.id.clone(),
         segments: path
@@ -204,21 +214,22 @@ fn resolve_path(
 }
 
 fn resolve_value(
+    language: LowerLanguage,
     file: &File,
     source: &str,
     path: &SurfacePath,
     value: &SurfaceValue,
 ) -> Result<PatchValue, PatchTextError> {
-    let node_kind = resolve_node_kind(file, source, &path.node)?;
+    let node_kind = resolve_node_kind(language, file, source, &path.node)?;
     ensure_single_segment_path(source, path)?;
     let segment = &path.segments[0];
-    let value_kind = path_spec(node_kind, &segment.name)
+    let value_kind = path_spec(language, node_kind, &segment.name)
         .map(|spec| spec.value_kind)
         .ok_or_else(|| {
             patch_text_error(
                 source,
                 segment.span,
-                &invalid_set_path_message(&path.node.id, &segment.name, node_kind),
+                &invalid_set_path_message(language, &path.node.id, &segment.name, node_kind),
             )
         })?;
     match (&value.kind, value_kind) {
@@ -232,7 +243,7 @@ fn resolve_value(
                 "path `@{}.{}` expects {}",
                 path.node.id,
                 segment.name,
-                value_kind_label(expected)
+                value_kind_label(language, expected)
             ),
         )),
     }
@@ -304,13 +315,14 @@ fn parse_fragment(
 }
 
 fn dest_owner_kind(
+    language: LowerLanguage,
     file: &File,
     source: &str,
     owner: &SurfaceSlotOwner,
 ) -> Result<NodeKind, PatchTextError> {
     match owner {
         SurfaceSlotOwner::File { .. } => Ok(NodeKind::File),
-        SurfaceSlotOwner::Node(node) => resolve_node_kind(file, source, node),
+        SurfaceSlotOwner::Node(node) => resolve_node_kind(language, file, source, node),
     }
 }
 
@@ -327,11 +339,12 @@ fn ensure_single_segment_path(source: &str, path: &SurfacePath) -> Result<(), Pa
 }
 
 fn ensure_node_exists(
+    language: LowerLanguage,
     file: &File,
     source: &str,
     node: &SurfaceNodeRef,
 ) -> Result<SurfaceNodeRef, PatchTextError> {
-    if find_node_kind(file, &node.id).is_some() {
+    if find_node_kind(language, file, &node.id).is_some() {
         Ok(node.clone())
     } else {
         Err(patch_text_error(
@@ -343,11 +356,12 @@ fn ensure_node_exists(
 }
 
 fn resolve_node_kind(
+    language: LowerLanguage,
     file: &File,
     source: &str,
     node: &SurfaceNodeRef,
 ) -> Result<NodeKind, PatchTextError> {
-    find_node_kind(file, &node.id).ok_or_else(|| {
+    find_node_kind(language, file, &node.id).ok_or_else(|| {
         patch_text_error(
             source,
             node.span,

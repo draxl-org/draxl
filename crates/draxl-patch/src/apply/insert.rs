@@ -8,9 +8,10 @@ use crate::model::{PatchNode, RankedDest, SlotOwner};
 use crate::schema::{
     expr_kind, invalid_ranked_slot_message, item_kind, ranked_slot_spec, NodeKind,
 };
-use draxl_ast::{Block, Expr, File, Item, Stmt};
+use draxl_ast::{Block, Expr, File, Item, LowerLanguage, Stmt};
 
 pub(super) fn apply_insert(
+    language: LowerLanguage,
     file: &mut File,
     dest: RankedDest,
     node: PatchNode,
@@ -20,13 +21,19 @@ pub(super) fn apply_insert(
     let mut node = Some(node);
     let found = match &dest.slot.owner {
         SlotOwner::File => {
-            insert_into_file_slot(&mut file.items, &dest.slot.slot, &dest.rank, &mut node)?;
+            insert_into_file_slot(
+                language,
+                &mut file.items,
+                &dest.slot.slot,
+                &dest.rank,
+                &mut node,
+            )?;
             true
         }
         SlotOwner::Node(id) => {
             let mut found = false;
             for item in &mut file.items {
-                if insert_into_item(item, id, &dest.slot.slot, &dest.rank, &mut node)? {
+                if insert_into_item(language, item, id, &dest.slot.slot, &dest.rank, &mut node)? {
                     found = true;
                     break;
                 }
@@ -46,13 +53,14 @@ pub(super) fn apply_insert(
 }
 
 fn insert_into_file_slot(
+    language: LowerLanguage,
     items: &mut Vec<Item>,
     public_slot: &str,
     rank: &str,
     node: &mut Option<PatchNode>,
 ) -> Result<(), PatchError> {
-    let spec = ranked_slot_spec(NodeKind::File, public_slot)
-        .ok_or_else(|| patch_error(&invalid_ranked_slot_message("file", public_slot)))?;
+    let spec = ranked_slot_spec(language, NodeKind::File, public_slot)
+        .ok_or_else(|| patch_error(&invalid_ranked_slot_message(language, "file", public_slot)))?;
     let mut item = expect_item(node.take(), spec.public_name)?;
     assign_item_slot_and_rank(&mut item, spec.meta_slot_name, Some(rank), true)?;
     items.push(item);
@@ -60,6 +68,7 @@ fn insert_into_file_slot(
 }
 
 fn insert_into_item(
+    language: LowerLanguage,
     item: &mut Item,
     owner_id: &str,
     public_slot: &str,
@@ -67,12 +76,15 @@ fn insert_into_item(
     node: &mut Option<PatchNode>,
 ) -> Result<bool, PatchError> {
     if item.meta().id == owner_id {
-        let spec = ranked_slot_spec(item_kind(item), public_slot).ok_or_else(|| {
-            patch_error(&invalid_ranked_slot_message(
-                &format!("@{owner_id}"),
-                public_slot,
-            ))
-        })?;
+        let spec = ranked_slot_spec(language, item_kind(language, item), public_slot).ok_or_else(
+            || {
+                patch_error(&invalid_ranked_slot_message(
+                    language,
+                    &format!("@{owner_id}"),
+                    public_slot,
+                ))
+            },
+        )?;
         match item {
             Item::Mod(module) => {
                 let mut child = expect_item(node.take(), spec.public_name)?;
@@ -123,13 +135,20 @@ fn insert_into_item(
     match item {
         Item::Mod(module) => {
             for child in &mut module.items {
-                if insert_into_item(child, owner_id, public_slot, rank, node)? {
+                if insert_into_item(language, child, owner_id, public_slot, rank, node)? {
                     return Ok(true);
                 }
             }
         }
         Item::Fn(function) => {
-            if insert_into_block(&mut function.body, owner_id, public_slot, rank, node)? {
+            if insert_into_block(
+                language,
+                &mut function.body,
+                owner_id,
+                public_slot,
+                rank,
+                node,
+            )? {
                 return Ok(true);
             }
         }
@@ -140,6 +159,7 @@ fn insert_into_item(
 }
 
 fn insert_into_block(
+    language: LowerLanguage,
     block: &mut Block,
     owner_id: &str,
     public_slot: &str,
@@ -148,12 +168,14 @@ fn insert_into_block(
 ) -> Result<bool, PatchError> {
     if let Some(meta) = &block.meta {
         if meta.id == owner_id {
-            let spec = ranked_slot_spec(NodeKind::ExprBlock, public_slot).ok_or_else(|| {
-                patch_error(&invalid_ranked_slot_message(
-                    &format!("@{owner_id}"),
-                    public_slot,
-                ))
-            })?;
+            let spec =
+                ranked_slot_spec(language, NodeKind::ExprBlock, public_slot).ok_or_else(|| {
+                    patch_error(&invalid_ranked_slot_message(
+                        language,
+                        &format!("@{owner_id}"),
+                        public_slot,
+                    ))
+                })?;
             let mut stmt = expect_stmt(node.take(), spec.public_name)?;
             assign_stmt_slot_and_rank(&mut stmt, spec.meta_slot_name, Some(rank), true)?;
             block.stmts.push(stmt);
@@ -162,7 +184,7 @@ fn insert_into_block(
     }
 
     for stmt in &mut block.stmts {
-        if insert_into_stmt(stmt, owner_id, public_slot, rank, node)? {
+        if insert_into_stmt(language, stmt, owner_id, public_slot, rank, node)? {
             return Ok(true);
         }
     }
@@ -171,6 +193,7 @@ fn insert_into_block(
 }
 
 fn insert_into_stmt(
+    language: LowerLanguage,
     stmt: &mut Stmt,
     owner_id: &str,
     public_slot: &str,
@@ -178,18 +201,29 @@ fn insert_into_stmt(
     node: &mut Option<PatchNode>,
 ) -> Result<bool, PatchError> {
     match stmt {
-        Stmt::Let(let_stmt) => {
-            insert_into_expr(&mut let_stmt.value, owner_id, public_slot, rank, node)
-        }
-        Stmt::Expr(expr_stmt) => {
-            insert_into_expr(&mut expr_stmt.expr, owner_id, public_slot, rank, node)
-        }
-        Stmt::Item(item) => insert_into_item(item, owner_id, public_slot, rank, node),
+        Stmt::Let(let_stmt) => insert_into_expr(
+            language,
+            &mut let_stmt.value,
+            owner_id,
+            public_slot,
+            rank,
+            node,
+        ),
+        Stmt::Expr(expr_stmt) => insert_into_expr(
+            language,
+            &mut expr_stmt.expr,
+            owner_id,
+            public_slot,
+            rank,
+            node,
+        ),
+        Stmt::Item(item) => insert_into_item(language, item, owner_id, public_slot, rank, node),
         Stmt::Doc(_) | Stmt::Comment(_) => Ok(false),
     }
 }
 
 fn insert_into_expr(
+    language: LowerLanguage,
     expr: &mut Expr,
     owner_id: &str,
     public_slot: &str,
@@ -198,12 +232,14 @@ fn insert_into_expr(
 ) -> Result<bool, PatchError> {
     if let Some(meta) = expr.meta() {
         if meta.id == owner_id {
-            let spec = ranked_slot_spec(expr_kind(expr), public_slot).ok_or_else(|| {
-                patch_error(&invalid_ranked_slot_message(
-                    &format!("@{owner_id}"),
-                    public_slot,
-                ))
-            })?;
+            let spec = ranked_slot_spec(language, expr_kind(language, expr), public_slot)
+                .ok_or_else(|| {
+                    patch_error(&invalid_ranked_slot_message(
+                        language,
+                        &format!("@{owner_id}"),
+                        public_slot,
+                    ))
+                })?;
             match expr {
                 Expr::Match(match_expr) => {
                     let mut arm = expect_match_arm(node.take(), spec.public_name)?;
@@ -228,42 +264,60 @@ fn insert_into_expr(
     }
 
     match expr {
-        Expr::Group(group) => insert_into_expr(&mut group.expr, owner_id, public_slot, rank, node),
+        Expr::Group(group) => {
+            insert_into_expr(language, &mut group.expr, owner_id, public_slot, rank, node)
+        }
         Expr::Binary(binary) => {
-            if insert_into_expr(&mut binary.lhs, owner_id, public_slot, rank, node)? {
+            if insert_into_expr(language, &mut binary.lhs, owner_id, public_slot, rank, node)? {
                 return Ok(true);
             }
-            insert_into_expr(&mut binary.rhs, owner_id, public_slot, rank, node)
+            insert_into_expr(language, &mut binary.rhs, owner_id, public_slot, rank, node)
         }
-        Expr::Unary(unary) => insert_into_expr(&mut unary.expr, owner_id, public_slot, rank, node),
+        Expr::Unary(unary) => {
+            insert_into_expr(language, &mut unary.expr, owner_id, public_slot, rank, node)
+        }
         Expr::Call(call) => {
-            if insert_into_expr(&mut call.callee, owner_id, public_slot, rank, node)? {
+            if insert_into_expr(
+                language,
+                &mut call.callee,
+                owner_id,
+                public_slot,
+                rank,
+                node,
+            )? {
                 return Ok(true);
             }
             for arg in &mut call.args {
-                if insert_into_expr(arg, owner_id, public_slot, rank, node)? {
+                if insert_into_expr(language, arg, owner_id, public_slot, rank, node)? {
                     return Ok(true);
                 }
             }
             Ok(false)
         }
         Expr::Match(match_expr) => {
-            if insert_into_expr(&mut match_expr.scrutinee, owner_id, public_slot, rank, node)? {
+            if insert_into_expr(
+                language,
+                &mut match_expr.scrutinee,
+                owner_id,
+                public_slot,
+                rank,
+                node,
+            )? {
                 return Ok(true);
             }
             for arm in &mut match_expr.arms {
                 if let Some(guard) = &mut arm.guard {
-                    if insert_into_expr(guard, owner_id, public_slot, rank, node)? {
+                    if insert_into_expr(language, guard, owner_id, public_slot, rank, node)? {
                         return Ok(true);
                     }
                 }
-                if insert_into_expr(&mut arm.body, owner_id, public_slot, rank, node)? {
+                if insert_into_expr(language, &mut arm.body, owner_id, public_slot, rank, node)? {
                     return Ok(true);
                 }
             }
             Ok(false)
         }
-        Expr::Block(block) => insert_into_block(block, owner_id, public_slot, rank, node),
+        Expr::Block(block) => insert_into_block(language, block, owner_id, public_slot, rank, node),
         Expr::Path(_) | Expr::Lit(_) => Ok(false),
     }
 }

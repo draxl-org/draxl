@@ -53,6 +53,16 @@ fn lower_rust_command_matches_the_lowered_golden() {
 }
 
 #[test]
+fn lower_command_matches_the_lowered_golden() {
+    let output = run_ok(&[
+        "lower",
+        repo_path("examples/04_ranks.rs.dx").to_str().unwrap(),
+    ]);
+    let expected = read_repo("tests/golden/04_ranks.lowered.rs");
+    assert_eq!(output, expected);
+}
+
+#[test]
 fn fmt_in_place_rewrites_the_file() {
     let path = write_temp_file(
         "fmt_in_place.rs.dx",

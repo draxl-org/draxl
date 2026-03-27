@@ -13,31 +13,36 @@ use crate::schema::{
     slot_spec, trivia_move_target_message, unsupported_slot_error_message, AttachmentContainerKind,
     NodeKind,
 };
-use draxl_ast::{Block, Expr, File, Item, MatchArm, Stmt};
+use draxl_ast::{Block, Expr, File, Item, LowerLanguage, MatchArm, Stmt};
 
 pub(super) fn apply_move(
+    language: LowerLanguage,
     file: &mut File,
     target_id: &str,
     dest: PatchDest,
 ) -> Result<(), PatchError> {
     let mut working = file.clone();
-    let mut extracted = extract_from_items(&mut working.items, target_id)?
+    let mut extracted = extract_from_items(language, &mut working.items, target_id)?
         .ok_or_else(|| patch_error(&format!("move target `{target_id}` was not found")))?;
 
     clear_patch_node_outer_placement(&mut extracted.node);
 
     match dest.clone() {
-        PatchDest::Ranked(dest) => insert::apply_insert(&mut working, dest, extracted.node)?,
+        PatchDest::Ranked(dest) => {
+            insert::apply_insert(language, &mut working, dest, extracted.node)?
+        }
         PatchDest::Slot(slot) => {
             if extracted.closure.is_some() {
-                return Err(patch_error(single_slot_attachment_closure_message()));
+                return Err(patch_error(single_slot_attachment_closure_message(
+                    language,
+                )));
             }
-            put::apply_put(&mut working, slot, extracted.node)?;
+            put::apply_put(language, &mut working, slot, extracted.node)?;
         }
     }
 
     if let Some(closure) = extracted.closure {
-        append_attachment_closure(&mut working, &dest, target_id, closure)?;
+        append_attachment_closure(language, &mut working, &dest, target_id, closure)?;
     }
 
     *file = working;
@@ -55,12 +60,13 @@ struct ExtractedNode {
 }
 
 fn extract_from_items(
+    language: LowerLanguage,
     items: &mut Vec<Item>,
     target_id: &str,
 ) -> Result<Option<ExtractedNode>, PatchError> {
     if let Some(index) = items.iter().position(|item| item.meta().id == target_id) {
         if is_item_trivia(&items[index]) {
-            return Err(patch_error(trivia_move_target_message()));
+            return Err(patch_error(trivia_move_target_message(language)));
         }
 
         let attachment_targets = resolved_item_attachment_targets(items);
@@ -86,7 +92,7 @@ fn extract_from_items(
     }
 
     for item in items {
-        if let Some(extracted) = extract_from_item(item, target_id)? {
+        if let Some(extracted) = extract_from_item(language, item, target_id)? {
             return Ok(Some(extracted));
         }
     }
@@ -95,11 +101,12 @@ fn extract_from_items(
 }
 
 fn extract_from_item(
+    language: LowerLanguage,
     item: &mut Item,
     target_id: &str,
 ) -> Result<Option<ExtractedNode>, PatchError> {
     match item {
-        Item::Mod(module) => extract_from_items(&mut module.items, target_id),
+        Item::Mod(module) => extract_from_items(language, &mut module.items, target_id),
         Item::Struct(strukt) => {
             if let Some(index) = strukt
                 .fields
@@ -113,7 +120,7 @@ fn extract_from_item(
             }
             for field in &strukt.fields {
                 if field.ty.meta().id == target_id {
-                    return removable_source_error(target_id, NodeKind::Field, "ty");
+                    return removable_source_error(language, target_id, NodeKind::Field, "ty");
                 }
             }
             Ok(None)
@@ -144,7 +151,7 @@ fn extract_from_item(
             }
             for param in &function.params {
                 if param.ty.meta().id == target_id {
-                    return removable_source_error(target_id, NodeKind::Param, "ty");
+                    return removable_source_error(language, target_id, NodeKind::Param, "ty");
                 }
             }
             if function
@@ -152,7 +159,7 @@ fn extract_from_item(
                 .as_ref()
                 .is_some_and(|ret_ty| ret_ty.meta().id == target_id)
             {
-                ensure_removable_source(target_id, NodeKind::Fn, "ret")?;
+                ensure_removable_source(language, target_id, NodeKind::Fn, "ret")?;
                 return Ok(Some(ExtractedNode {
                     node: PatchNode::Type(
                         function
@@ -163,13 +170,14 @@ fn extract_from_item(
                     closure: None,
                 }));
             }
-            extract_from_block(&mut function.body, target_id)
+            extract_from_block(language, &mut function.body, target_id)
         }
         Item::Use(_) | Item::Doc(_) | Item::Comment(_) => Ok(None),
     }
 }
 
 fn extract_from_block(
+    language: LowerLanguage,
     block: &mut Block,
     target_id: &str,
 ) -> Result<Option<ExtractedNode>, PatchError> {
@@ -179,7 +187,7 @@ fn extract_from_block(
         .position(|stmt| stmt_id(stmt).is_some_and(|id| id == target_id))
     {
         if is_stmt_trivia(&block.stmts[index]) {
-            return Err(patch_error(trivia_move_target_message()));
+            return Err(patch_error(trivia_move_target_message(language)));
         }
 
         let attachment_targets = resolved_stmt_attachment_targets(&block.stmts);
@@ -205,7 +213,7 @@ fn extract_from_block(
     }
 
     for stmt in &mut block.stmts {
-        if let Some(extracted) = extract_from_stmt(stmt, target_id)? {
+        if let Some(extracted) = extract_from_stmt(language, stmt, target_id)? {
             return Ok(Some(extracted));
         }
     }
@@ -214,71 +222,73 @@ fn extract_from_block(
 }
 
 fn extract_from_stmt(
+    language: LowerLanguage,
     stmt: &mut Stmt,
     target_id: &str,
 ) -> Result<Option<ExtractedNode>, PatchError> {
     match stmt {
         Stmt::Let(let_stmt) => {
             if pattern_id(&let_stmt.pat).is_some_and(|id| id == target_id) {
-                return removable_source_error(target_id, NodeKind::LetStmt, "pat");
+                return removable_source_error(language, target_id, NodeKind::LetStmt, "pat");
             }
             if expr_id(&let_stmt.value).is_some_and(|id| id == target_id) {
-                return removable_source_error(target_id, NodeKind::LetStmt, "init");
+                return removable_source_error(language, target_id, NodeKind::LetStmt, "init");
             }
-            extract_from_expr(&mut let_stmt.value, target_id)
+            extract_from_expr(language, &mut let_stmt.value, target_id)
         }
         Stmt::Expr(expr_stmt) => {
             if expr_id(&expr_stmt.expr).is_some_and(|id| id == target_id) {
-                return removable_source_error(target_id, NodeKind::ExprStmt, "expr");
+                return removable_source_error(language, target_id, NodeKind::ExprStmt, "expr");
             }
-            extract_from_expr(&mut expr_stmt.expr, target_id)
+            extract_from_expr(language, &mut expr_stmt.expr, target_id)
         }
-        Stmt::Item(item) => extract_from_item(item, target_id),
+        Stmt::Item(item) => extract_from_item(language, item, target_id),
         Stmt::Doc(_) | Stmt::Comment(_) => Ok(None),
     }
 }
 
 fn extract_from_expr(
+    language: LowerLanguage,
     expr: &mut Expr,
     target_id: &str,
 ) -> Result<Option<ExtractedNode>, PatchError> {
     match expr {
         Expr::Group(group) => {
             if expr_id(&group.expr).is_some_and(|id| id == target_id) {
-                return removable_source_error(target_id, NodeKind::ExprGroup, "expr");
+                return removable_source_error(language, target_id, NodeKind::ExprGroup, "expr");
             }
-            extract_from_expr(&mut group.expr, target_id)
+            extract_from_expr(language, &mut group.expr, target_id)
         }
         Expr::Binary(binary) => {
             if expr_id(&binary.lhs).is_some_and(|id| id == target_id) {
-                return removable_source_error(target_id, NodeKind::ExprBinary, "lhs");
+                return removable_source_error(language, target_id, NodeKind::ExprBinary, "lhs");
             }
             if expr_id(&binary.rhs).is_some_and(|id| id == target_id) {
-                return removable_source_error(target_id, NodeKind::ExprBinary, "rhs");
+                return removable_source_error(language, target_id, NodeKind::ExprBinary, "rhs");
             }
-            if let Some(extracted) = extract_from_expr(&mut binary.lhs, target_id)? {
+            if let Some(extracted) = extract_from_expr(language, &mut binary.lhs, target_id)? {
                 return Ok(Some(extracted));
             }
-            extract_from_expr(&mut binary.rhs, target_id)
+            extract_from_expr(language, &mut binary.rhs, target_id)
         }
         Expr::Unary(unary) => {
             if expr_id(&unary.expr).is_some_and(|id| id == target_id) {
-                return removable_source_error(target_id, NodeKind::ExprUnary, "expr");
+                return removable_source_error(language, target_id, NodeKind::ExprUnary, "expr");
             }
-            extract_from_expr(&mut unary.expr, target_id)
+            extract_from_expr(language, &mut unary.expr, target_id)
         }
         Expr::Call(call) => {
             if expr_id(&call.callee).is_some_and(|id| id == target_id) {
-                return removable_source_error(target_id, NodeKind::ExprCall, "callee");
+                return removable_source_error(language, target_id, NodeKind::ExprCall, "callee");
             }
-            if let Some(extracted) = extract_from_expr(&mut call.callee, target_id)? {
+            if let Some(extracted) = extract_from_expr(language, &mut call.callee, target_id)? {
                 return Ok(Some(extracted));
             }
             for arg in &mut call.args {
                 if expr_id(arg).is_some_and(|id| id == target_id) {
-                    return removable_source_error(target_id, NodeKind::ExprCall, "args");
+                    return removable_source_error(language, target_id, NodeKind::ExprCall, "args");
                 }
-                if let Some(extracted) = extract_from_expr(arg, target_id)? {
+                if let Some(extracted) = extract_from_expr(language, arg, target_id)? {
                     return Ok(Some(extracted));
                 }
             }
@@ -296,36 +306,44 @@ fn extract_from_expr(
                 }));
             }
             if expr_id(&match_expr.scrutinee).is_some_and(|id| id == target_id) {
-                return removable_source_error(target_id, NodeKind::ExprMatch, "scrutinee");
+                return removable_source_error(
+                    language,
+                    target_id,
+                    NodeKind::ExprMatch,
+                    "scrutinee",
+                );
             }
-            if let Some(extracted) = extract_from_expr(&mut match_expr.scrutinee, target_id)? {
+            if let Some(extracted) =
+                extract_from_expr(language, &mut match_expr.scrutinee, target_id)?
+            {
                 return Ok(Some(extracted));
             }
             for arm in &mut match_expr.arms {
-                if let Some(extracted) = extract_from_match_arm(arm, target_id)? {
+                if let Some(extracted) = extract_from_match_arm(language, arm, target_id)? {
                     return Ok(Some(extracted));
                 }
             }
             Ok(None)
         }
-        Expr::Block(block) => extract_from_block(block, target_id),
+        Expr::Block(block) => extract_from_block(language, block, target_id),
         Expr::Path(_) | Expr::Lit(_) => Ok(None),
     }
 }
 
 fn extract_from_match_arm(
+    language: LowerLanguage,
     arm: &mut MatchArm,
     target_id: &str,
 ) -> Result<Option<ExtractedNode>, PatchError> {
     if pattern_id(&arm.pat).is_some_and(|id| id == target_id) {
-        return removable_source_error(target_id, NodeKind::MatchArm, "pat");
+        return removable_source_error(language, target_id, NodeKind::MatchArm, "pat");
     }
     if arm
         .guard
         .as_ref()
         .is_some_and(|guard| expr_id(guard).is_some_and(|id| id == target_id))
     {
-        ensure_removable_source(target_id, NodeKind::MatchArm, "guard")?;
+        ensure_removable_source(language, target_id, NodeKind::MatchArm, "guard")?;
         return Ok(Some(ExtractedNode {
             node: PatchNode::Expr(
                 arm.guard
@@ -336,35 +354,36 @@ fn extract_from_match_arm(
         }));
     }
     if let Some(guard) = &mut arm.guard {
-        if let Some(extracted) = extract_from_expr(guard, target_id)? {
+        if let Some(extracted) = extract_from_expr(language, guard, target_id)? {
             return Ok(Some(extracted));
         }
     }
     if expr_id(&arm.body).is_some_and(|id| id == target_id) {
-        return removable_source_error(target_id, NodeKind::MatchArm, "body");
+        return removable_source_error(language, target_id, NodeKind::MatchArm, "body");
     }
-    extract_from_expr(&mut arm.body, target_id)
+    extract_from_expr(language, &mut arm.body, target_id)
 }
 
 fn append_attachment_closure(
+    language: LowerLanguage,
     file: &mut File,
     dest: &PatchDest,
     target_id: &str,
     closure: AttachmentClosure,
 ) -> Result<(), PatchError> {
-    validate_attachment_destination(file, dest, &closure)?;
+    validate_attachment_destination(language, file, dest, &closure)?;
 
     match (dest, closure) {
         (PatchDest::Ranked(dest), AttachmentClosure::Items(items)) => {
             append_item_closure(file, dest, target_id, items)
         }
         (PatchDest::Ranked(dest), AttachmentClosure::Stmts(stmts)) => {
-            append_stmt_closure(file, dest, target_id, stmts)
+            append_stmt_closure(language, file, dest, target_id, stmts)
         }
         (PatchDest::Slot(_), AttachmentClosure::Items(_))
-        | (PatchDest::Slot(_), AttachmentClosure::Stmts(_)) => {
-            Err(patch_error(single_slot_attachment_closure_message()))
-        }
+        | (PatchDest::Slot(_), AttachmentClosure::Stmts(_)) => Err(patch_error(
+            single_slot_attachment_closure_message(language),
+        )),
     }
 }
 
@@ -430,6 +449,7 @@ fn append_items_to_owner(
 }
 
 fn append_stmt_closure(
+    language: LowerLanguage,
     file: &mut File,
     dest: &RankedDest,
     target_id: &str,
@@ -446,6 +466,7 @@ fn append_stmt_closure(
 
     match &dest.slot.owner {
         SlotOwner::File => Err(patch_error(&invalid_attachment_container_owner_message(
+            language,
             &slot_owner_label(&dest.slot.owner),
             AttachmentContainerKind::Stmts,
         ))),
@@ -624,6 +645,7 @@ fn append_stmts_to_item(
 }
 
 fn validate_attachment_destination(
+    language: LowerLanguage,
     file: &File,
     dest: &PatchDest,
     closure: &AttachmentClosure,
@@ -631,28 +653,32 @@ fn validate_attachment_destination(
     let closure_kind = attachment_closure_kind(closure);
 
     let PatchDest::Ranked(dest) = dest else {
-        return Err(patch_error(single_slot_attachment_closure_message()));
+        return Err(patch_error(single_slot_attachment_closure_message(
+            language,
+        )));
     };
 
     let (owner_kind, owner_label) = match &dest.slot.owner {
         SlotOwner::File => (NodeKind::File, slot_owner_label(&dest.slot.owner)),
         SlotOwner::Node(owner_id) => (
-            find_node_kind(file, owner_id).ok_or_else(|| {
+            find_node_kind(language, file, owner_id).ok_or_else(|| {
                 patch_error(&attachment_owner_not_found_message(owner_id, closure_kind))
             })?,
             slot_owner_label(&dest.slot.owner),
         ),
     };
 
-    if attachment_container_kind_for_owner(owner_kind) != Some(closure_kind) {
+    if attachment_container_kind_for_owner(language, owner_kind) != Some(closure_kind) {
         return Err(patch_error(&invalid_attachment_container_owner_message(
+            language,
             &owner_label,
             closure_kind,
         )));
     }
 
-    if !attachment_closure_allowed(owner_kind, &dest.slot.slot, closure_kind) {
+    if !attachment_closure_allowed(language, owner_kind, &dest.slot.slot, closure_kind) {
         return Err(patch_error(invalid_attachment_closure_destination_message(
+            language,
             closure_kind,
         )));
     }
@@ -682,26 +708,28 @@ fn attachment_owner_not_found_message(
 }
 
 fn removable_source_error(
+    language: LowerLanguage,
     target_id: &str,
     owner_kind: NodeKind,
     slot: &str,
 ) -> Result<Option<ExtractedNode>, PatchError> {
-    ensure_removable_source(target_id, owner_kind, slot)?;
+    ensure_removable_source(language, target_id, owner_kind, slot)?;
     Ok(None)
 }
 
 fn ensure_removable_source(
+    language: LowerLanguage,
     target_id: &str,
     owner_kind: NodeKind,
     slot: &str,
 ) -> Result<(), PatchError> {
-    match removable_slot_spec(owner_kind, slot) {
+    match removable_slot_spec(language, owner_kind, slot) {
         Some(_) => Ok(()),
         None => {
-            let message = if slot_spec(owner_kind, slot).is_some() {
-                required_slot_error_message("move", target_id, slot)
+            let message = if slot_spec(language, owner_kind, slot).is_some() {
+                required_slot_error_message(language, "move", target_id, slot)
             } else {
-                unsupported_slot_error_message("move", target_id, slot)
+                unsupported_slot_error_message(language, "move", target_id, slot)
             };
             Err(patch_error(&message))
         }

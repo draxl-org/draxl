@@ -48,7 +48,7 @@ pub fn apply_patch_text_for_language(
     let surface_ops = parse_patch_ops(source)?;
     for surface_op in &surface_ops {
         let resolved = resolve::resolve_op(language, file, source, surface_op)?;
-        crate::apply_op(file, resolved.op)
+        crate::apply_op_for_language(language, file, resolved.op)
             .map_err(|error| error::patch_text_error(source, resolved.span, &error.message))?;
     }
     Ok(())
