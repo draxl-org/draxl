@@ -1,35 +1,11 @@
-use crate::context::{LetRegion, TreeContext};
+use crate::context::TreeContext;
 use crate::model::{ConflictOwner, ConflictRegion};
-use draxl_ast::{Expr, Stmt};
 use draxl_patch::{PatchDest, PatchNode, PatchOp, PatchValue, SlotOwner, SlotRef};
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum SemanticOwner {
-    Binding {
-        let_id: String,
-        binding_id: String,
-    },
-    Parameter {
-        fn_id: String,
-        param_id: String,
-        param_name: String,
-    },
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum SemanticRegion {
-    BindingName,
-    BindingInitializer,
-    ParameterTypeContract,
-    ParameterBodyInterpretation,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct SemanticChange {
-    pub owner: SemanticOwner,
-    pub region: SemanticRegion,
-    pub op_index: usize,
-}
+use draxl_rust::{
+    extract_semantic_changes as extract_rust_semantic_changes, SemanticOp, SemanticPatchNode,
+    SemanticSlotOwner, SemanticSlotRef,
+};
+pub(crate) use draxl_rust::{SemanticChange, SemanticOwner, SemanticRegion};
 
 impl From<&SemanticOwner> for ConflictOwner {
     fn from(owner: &SemanticOwner) -> Self {
@@ -66,271 +42,62 @@ pub(crate) fn extract_semantic_changes(
     ops: &[PatchOp],
     context: &TreeContext,
 ) -> Vec<SemanticChange> {
-    let mut changes = Vec::new();
-
-    for (op_index, op) in ops.iter().enumerate() {
-        changes.extend(semantic_changes_for_op(op_index, op, context));
-    }
-
-    changes
+    let semantic_ops = ops.iter().map(translate_op).collect::<Vec<_>>();
+    extract_rust_semantic_changes(&semantic_ops, context)
 }
 
-fn semantic_changes_for_op(
-    op_index: usize,
-    op: &PatchOp,
-    context: &TreeContext,
-) -> Vec<SemanticChange> {
-    let mut changes = Vec::new();
-
-    if let Some(owner) = binding_name_owner(op, context) {
-        changes.push(SemanticChange {
-            owner,
-            region: SemanticRegion::BindingName,
-            op_index,
-        });
-    }
-
-    if let Some(owner) = binding_initializer_owner(op, context) {
-        changes.push(SemanticChange {
-            owner,
-            region: SemanticRegion::BindingInitializer,
-            op_index,
-        });
-    }
-
-    if let Some(owner) = parameter_type_contract_owner(op, context) {
-        changes.push(SemanticChange {
-            owner,
-            region: SemanticRegion::ParameterTypeContract,
-            op_index,
-        });
-    }
-
-    changes.extend(parameter_body_interpretation_changes(op_index, op, context));
-
-    changes
-}
-
-fn binding_name_owner(op: &PatchOp, context: &TreeContext) -> Option<SemanticOwner> {
+fn translate_op(op: &PatchOp) -> SemanticOp {
     match op {
-        PatchOp::Set { path, value } if path.segments.as_slice() == ["name"] => {
-            let PatchValue::Ident(_) = value else {
-                return None;
-            };
-            let node = context.node(&path.node_id)?;
-            if !node.is_let_binding {
-                return None;
-            }
-            binding_owner_for_let(node.enclosing_let.as_deref()?, context)
+        PatchOp::Insert { .. } | PatchOp::Attach { .. } | PatchOp::Detach { .. } => {
+            SemanticOp::Other
         }
-        _ => None,
-    }
-}
-
-fn binding_initializer_owner(op: &PatchOp, context: &TreeContext) -> Option<SemanticOwner> {
-    match op {
-        PatchOp::Put { slot, .. } => init_slot_binding_owner(slot, context),
-        PatchOp::Move {
-            target_id,
-            dest: PatchDest::Slot(slot),
-        } => init_slot_binding_owner(slot, context)
-            .or_else(|| node_in_init_region_binding_owner(target_id, context)),
-        PatchOp::Replace { target_id, .. }
-        | PatchOp::Delete { target_id }
-        | PatchOp::Move { target_id, .. } => node_in_init_region_binding_owner(target_id, context),
-        PatchOp::Set { path, .. } | PatchOp::Clear { path } => {
-            node_in_init_region_binding_owner(&path.node_id, context)
-        }
-        _ => None,
-    }
-}
-
-fn init_slot_binding_owner(slot: &SlotRef, context: &TreeContext) -> Option<SemanticOwner> {
-    if slot.slot != "init" {
-        return None;
-    }
-
-    let SlotOwner::Node(owner_id) = &slot.owner else {
-        return None;
-    };
-
-    let node = context.node(owner_id)?;
-    if !node.is_let_stmt {
-        return None;
-    }
-
-    binding_owner_for_let(owner_id, context)
-}
-
-fn node_in_init_region_binding_owner(
-    node_id: &str,
-    context: &TreeContext,
-) -> Option<SemanticOwner> {
-    let node = context.node(node_id)?;
-    if node.let_region != Some(LetRegion::Init) {
-        return None;
-    }
-
-    binding_owner_for_let(node.enclosing_let.as_deref()?, context)
-}
-
-fn binding_owner_for_let(let_id: &str, context: &TreeContext) -> Option<SemanticOwner> {
-    Some(SemanticOwner::Binding {
-        let_id: let_id.to_owned(),
-        binding_id: context.binding_id_for_let(let_id)?.to_owned(),
-    })
-}
-
-fn parameter_type_contract_owner(op: &PatchOp, context: &TreeContext) -> Option<SemanticOwner> {
-    match op {
-        PatchOp::Put { slot, .. } => param_type_slot_owner(slot, context),
-        PatchOp::Move {
-            target_id,
-            dest: PatchDest::Slot(slot),
-        } => param_type_slot_owner(slot, context)
-            .or_else(|| node_in_param_type_region_owner(target_id, context)),
-        PatchOp::Replace { target_id, .. }
-        | PatchOp::Delete { target_id }
-        | PatchOp::Move { target_id, .. } => node_in_param_type_region_owner(target_id, context),
-        PatchOp::Set { path, .. } | PatchOp::Clear { path } => {
-            node_in_param_type_region_owner(&path.node_id, context)
-        }
-        _ => None,
-    }
-}
-
-fn param_type_slot_owner(slot: &SlotRef, context: &TreeContext) -> Option<SemanticOwner> {
-    if slot.slot != "ty" {
-        return None;
-    }
-
-    let SlotOwner::Node(owner_id) = &slot.owner else {
-        return None;
-    };
-
-    parameter_owner_from_param_id(owner_id, context)
-}
-
-fn node_in_param_type_region_owner(node_id: &str, context: &TreeContext) -> Option<SemanticOwner> {
-    let node = context.node(node_id)?;
-    if !node.param_type_region {
-        return None;
-    }
-
-    parameter_owner_from_param_id(node.enclosing_param.as_deref()?, context)
-}
-
-fn parameter_owner_from_param_id(param_id: &str, context: &TreeContext) -> Option<SemanticOwner> {
-    let node = context.node(param_id)?;
-    Some(SemanticOwner::Parameter {
-        fn_id: node.enclosing_fn.clone()?,
-        param_id: param_id.to_owned(),
-        param_name: node.param_name.clone()?,
-    })
-}
-
-fn parameter_body_interpretation_changes(
-    op_index: usize,
-    op: &PatchOp,
-    context: &TreeContext,
-) -> Vec<SemanticChange> {
-    let (fn_id, node) = match op {
+        PatchOp::Put { slot, node } => SemanticOp::Put {
+            slot: translate_slot_ref(slot),
+            node: translate_patch_node(node),
+        },
         PatchOp::Replace {
             target_id,
             replacement,
-        } => {
-            let Some(fn_id) = function_body_owner_id_for_node(target_id, context) else {
-                return Vec::new();
-            };
-            (fn_id, replacement)
-        }
-        PatchOp::Put { slot, node } => {
-            let Some(fn_id) = function_body_owner_id_for_slot(slot, context) else {
-                return Vec::new();
-            };
-            (fn_id, node)
-        }
-        _ => return Vec::new(),
-    };
-
-    context
-        .params_in_fn(&fn_id)
-        .iter()
-        .filter(|param| patch_node_mentions_name(node, &param.name))
-        .map(|param| SemanticChange {
-            owner: SemanticOwner::Parameter {
-                fn_id: fn_id.clone(),
-                param_id: param.id.clone(),
-                param_name: param.name.clone(),
+        } => SemanticOp::Replace {
+            target_id: target_id.clone(),
+            replacement: translate_patch_node(replacement),
+        },
+        PatchOp::Delete { target_id } => SemanticOp::Delete {
+            target_id: target_id.clone(),
+        },
+        PatchOp::Move { target_id, dest } => SemanticOp::Move {
+            target_id: target_id.clone(),
+            dest_slot: match dest {
+                PatchDest::Ranked(_) => None,
+                PatchDest::Slot(slot) => Some(translate_slot_ref(slot)),
             },
-            region: SemanticRegion::ParameterBodyInterpretation,
-            op_index,
-        })
-        .collect()
-}
-
-fn function_body_owner_id_for_node(node_id: &str, context: &TreeContext) -> Option<String> {
-    let node = context.node(node_id)?;
-    if !node.in_fn_body {
-        return None;
+        },
+        PatchOp::Set { path, value } => SemanticOp::Set {
+            node_id: path.node_id.clone(),
+            path: path.segments.clone(),
+            ident_value: matches!(value, PatchValue::Ident(_)),
+        },
+        PatchOp::Clear { path } => SemanticOp::Clear {
+            node_id: path.node_id.clone(),
+        },
     }
-
-    node.enclosing_fn.clone()
 }
 
-fn function_body_owner_id_for_slot(slot: &SlotRef, context: &TreeContext) -> Option<String> {
-    let SlotOwner::Node(owner_id) = &slot.owner else {
-        return None;
-    };
-
-    function_body_owner_id_for_node(owner_id, context)
+fn translate_slot_ref(slot: &SlotRef) -> SemanticSlotRef {
+    SemanticSlotRef {
+        owner: match &slot.owner {
+            SlotOwner::File => SemanticSlotOwner::File,
+            SlotOwner::Node(owner_id) => SemanticSlotOwner::Node(owner_id.clone()),
+        },
+        slot: slot.slot.clone(),
+    }
 }
 
-fn patch_node_mentions_name(node: &PatchNode, name: &str) -> bool {
+fn translate_patch_node(node: &PatchNode) -> Option<SemanticPatchNode> {
     match node {
-        PatchNode::Expr(expr) => expr_mentions_name(expr, name),
-        PatchNode::Stmt(stmt) => stmt_mentions_name(stmt, name),
-        _ => false,
-    }
-}
-
-fn stmt_mentions_name(stmt: &Stmt, name: &str) -> bool {
-    match stmt {
-        Stmt::Let(node) => expr_mentions_name(&node.value, name),
-        Stmt::Expr(node) => expr_mentions_name(&node.expr, name),
-        Stmt::Item(_) | Stmt::Doc(_) | Stmt::Comment(_) => false,
-    }
-}
-
-fn expr_mentions_name(expr: &Expr, name: &str) -> bool {
-    match expr {
-        Expr::Path(node) => node.path.segments.len() == 1 && node.path.segments[0] == name,
-        Expr::Lit(_) => false,
-        Expr::Group(node) => expr_mentions_name(&node.expr, name),
-        Expr::Binary(node) => {
-            expr_mentions_name(&node.lhs, name) || expr_mentions_name(&node.rhs, name)
-        }
-        Expr::Unary(node) => expr_mentions_name(&node.expr, name),
-        Expr::Call(node) => {
-            expr_mentions_name(&node.callee, name)
-                || node.args.iter().any(|arg| expr_mentions_name(arg, name))
-        }
-        Expr::Match(node) => {
-            expr_mentions_name(&node.scrutinee, name)
-                || node
-                    .arms
-                    .iter()
-                    .any(|arm| expr_mentions_name(&arm.body, name))
-                || node
-                    .arms
-                    .iter()
-                    .filter_map(|arm| arm.guard.as_ref())
-                    .any(|guard| expr_mentions_name(guard, name))
-        }
-        Expr::Block(block) => block
-            .stmts
-            .iter()
-            .any(|stmt| stmt_mentions_name(stmt, name)),
+        PatchNode::Expr(expr) => Some(SemanticPatchNode::Expr(expr.clone())),
+        PatchNode::Stmt(stmt) => Some(SemanticPatchNode::Stmt(stmt.clone())),
+        _ => None,
     }
 }
 

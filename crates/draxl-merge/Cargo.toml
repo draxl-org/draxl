@@ -12,6 +12,7 @@ description = "Merge analysis for Draxl patch streams."
 draxl-ast.workspace = true
 draxl-patch.workspace = true
 draxl-printer.workspace = true
+draxl-rust.workspace = true
 draxl-validate.workspace = true
 serde.workspace = true
 serde_json.workspace = true
