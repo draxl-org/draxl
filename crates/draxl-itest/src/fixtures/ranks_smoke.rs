@@ -1,0 +1,18 @@
+pub const SOURCE: &str = "\
+@m1 mod pipeline {
+  @f1[a] fn fetch() {
+  }
+
+  @f2[b] fn log() {
+  }
+
+  @f3[c] fn validate() {
+  }
+
+  @f4[d] fn run() {
+    @s1[a] @e1 fetch();
+    @s2[am] @e2 log();
+    @s3[b] @e3 validate();
+  }
+}
+";

@@ -23,6 +23,7 @@ members = [
     "crates/draxl-patch",
     "crates/draxl-merge",
     "crates/draxl-cli",
+    "crates/draxl-itest",
 ]
 resolver = "2"
 
