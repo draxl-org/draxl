@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-//! Public facade for Draxl, an agent-native source language with
+//! Public facade for Draxl, an agent-native source annotation layer with
 //! explicit syntax identity.
 //!
 //! Draxl makes syntax identity explicit with stable node ids, ranks, anchors,
