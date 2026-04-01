@@ -357,6 +357,7 @@ cargo run -p draxl-cli -- lower-rust examples/01_add.rs.dx
 cargo run -p draxl-cli -- conflicts <file> <left-patch-file> <right-patch-file>
 cargo run -p draxl-cli -- mcp setup --client codex --root .
 cargo run -p draxl-cli -- mcp serve --root .
+make codex-setup ROOT=.
 ```
 
 ## License
