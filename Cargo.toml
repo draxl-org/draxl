@@ -15,6 +15,7 @@ readme = "README.md"
 [workspace]
 members = [
     ".",
+    "crates/draxl-agent",
     "crates/draxl-ast",
     "crates/draxl-parser",
     "crates/draxl-printer",

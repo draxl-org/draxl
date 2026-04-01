@@ -180,6 +180,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "draxl-agent"
+version = "0.1.0"
+dependencies = [
+ "draxl",
+ "rmcp",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "draxl-ast"
 version = "0.1.0"
 
@@ -188,6 +199,9 @@ name = "draxl-cli"
 version = "0.1.0"
 dependencies = [
  "draxl",
+ "draxl-agent",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -195,12 +209,10 @@ name = "draxl-itest"
 version = "0.1.0"
 dependencies = [
  "draxl",
- "rmcp",
+ "draxl-agent",
  "serde",
  "serde_json",
- "sha2",
  "tempfile",
- "tokio",
 ]
 
 [[package]]

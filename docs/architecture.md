@@ -157,10 +157,21 @@ The merge crate owns conflict detection over patch streams:
 - semantic conflict extraction dispatched by `LowerLanguage`
 - structured conflict reports for humans and agents
 
+### `draxl-agent`
+
+The agent crate owns workspace-scoped semantic editing and the stdio MCP server:
+
+- workspace root restriction for `.rs.dx` edits
+- file inspection, node lookup, and fingerprinting
+- high-level edit operations such as `replace_node`, `insert_after_stmt`, and
+  `set_path`
+- raw patch-text application and conflict checks
+- stdio MCP tool serving over that shared backend
+
 ### `draxl-cli`
 
-The CLI is thin by design. It exercises the public `draxl` facade for the main
-workflows exposed to users:
+The CLI is thin by design. It exercises the public `draxl` facade for the core
+language workflows and `draxl-agent` for the agent-facing MCP workflow:
 
 - `parse`
 - `fmt`
@@ -170,6 +181,8 @@ workflows exposed to users:
 - `lower-rust`
 - `patch`
 - `conflicts`
+- `mcp serve`
+- `mcp setup --client codex`
 
 For commands that operate on Draxl source files, the CLI infers `LowerLanguage`
 from the source file extension such as `.rs.dx`. The Rust library API keeps the
@@ -203,4 +216,6 @@ stays visible in the architecture.
 ### The root crate is the API boundary
 
 The root `draxl` crate is the intended integration surface for Rust callers.
-The CLI exercises that shared surface for command-line workflows.
+The CLI exercises that shared surface for command-line workflows, while
+`draxl-agent` packages the workspace-scoped agent/MCP behavior that does not
+belong in the public Rust facade.

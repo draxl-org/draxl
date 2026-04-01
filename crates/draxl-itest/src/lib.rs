@@ -3,9 +3,7 @@
 pub mod codex;
 mod error;
 pub mod fixtures;
-pub mod mcp;
 pub mod scenarios;
-mod support;
 mod types;
 mod workspace;
 

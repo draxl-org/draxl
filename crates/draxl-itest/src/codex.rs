@@ -31,23 +31,20 @@ const APPROVED_DRAXL_TOOLS: &[&str] = &[
 
 pub struct CodexHarness {
     codex_home: TempDir,
-    mcp_server_bin: PathBuf,
+    draxl_bin: PathBuf,
     model: String,
     developer_instructions: String,
 }
 
 impl CodexHarness {
-    pub fn new(mcp_server_bin: impl Into<PathBuf>) -> crate::Result<Self> {
+    pub fn new(draxl_bin: impl Into<PathBuf>) -> crate::Result<Self> {
         let codex_home = Builder::new()
             .prefix("codex-home-")
             .tempdir_in(target_temp_root()?)
             .map_err(io_error("failed to create isolated CODEX_HOME"))?;
         let harness = Self {
             codex_home,
-            mcp_server_bin: canonicalize_path(
-                mcp_server_bin.into(),
-                "failed to canonicalize MCP server binary",
-            )?,
+            draxl_bin: canonicalize_path(draxl_bin.into(), "failed to canonicalize draxl binary")?,
             model: std::env::var("DRAXL_ITEST_CODEX_MODEL")
                 .unwrap_or_else(|_| "gpt-5.4".to_owned()),
             developer_instructions: DEFAULT_DEVELOPER_INSTRUCTIONS.to_owned(),
@@ -222,8 +219,8 @@ developer_instructions = '''
 trust_level = "trusted"
 
 [mcp_servers.draxl]
-command = "{server_bin}"
-args = ["--root", "{workspace_root}"]
+command = "{draxl_bin}"
+args = ["mcp", "serve", "--root", "{workspace_root}"]
 cwd = "{workspace_root}"
 default_tools_approval_mode = "approve"
 
@@ -232,7 +229,7 @@ default_tools_approval_mode = "approve"
             model = self.model,
             developer_instructions = self.developer_instructions,
             workspace_root = workspace_root.display(),
-            server_bin = self.mcp_server_bin.display(),
+            draxl_bin = self.draxl_bin.display(),
             tool_sections = tool_sections,
         );
 

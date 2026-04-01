@@ -73,9 +73,9 @@ const EXPECTED_AFTER: &str = "\
 #[test]
 #[ignore = "requires Codex auth/network for a real Codex+MCP end-to-end run"]
 fn codex_goal_driven_ranks_uses_draxl_tools_end_to_end() {
-    let mcp_server_bin = std::env::var("CARGO_BIN_EXE_draxl-itest-mcp")
-        .expect("cargo should expose the draxl-itest-mcp binary to integration tests");
-    let harness = CodexHarness::new(mcp_server_bin).expect("Codex harness should initialize");
+    let draxl_bin =
+        std::env::var("CARGO_BIN_EXE_draxl").expect("cargo should expose the draxl binary");
+    let harness = CodexHarness::new(draxl_bin).expect("Codex harness should initialize");
 
     let mut failures = Vec::new();
 

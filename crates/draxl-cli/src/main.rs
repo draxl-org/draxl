@@ -4,12 +4,15 @@
 //! The CLI intentionally uses the public `draxl` facade rather than re-wiring
 //! parser, validator, printer, and lowering behavior itself.
 
+mod mcp_setup;
+
 use draxl::{
     apply_patch_text_for_language, check_conflicts_json_for_language, dump_json_file,
     format_file_for_language, format_source_for_language, lower_rust_source,
     lower_source_for_language, parse_and_validate_for_language, parse_file_for_language,
     resolve_patch_ops_for_language, validate_file, LowerLanguage,
 };
+use draxl_agent::mcp;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -145,8 +148,72 @@ fn run() -> Result<(), String> {
             );
             Ok(())
         }
+        "mcp" => run_mcp(args),
         _ => Err(usage()),
     }
+}
+
+fn run_mcp<I>(args: I) -> Result<(), String>
+where
+    I: Iterator<Item = String>,
+{
+    let mut args = args;
+    let Some(subcommand) = args.next() else {
+        return Err(mcp_usage());
+    };
+
+    match subcommand.as_str() {
+        "serve" => {
+            let usage = mcp_usage();
+            let root = parse_optional_root_arg(args, "serve", &usage)?;
+            run_mcp_serve(root)
+        }
+        "setup" => mcp_setup::run_setup(args),
+        _ => Err(mcp_usage()),
+    }
+}
+
+fn run_mcp_serve(root: Option<PathBuf>) -> Result<(), String> {
+    let root = match root {
+        Some(root) => root,
+        None => env::current_dir()
+            .map_err(|err| format!("failed to determine current directory: {err}"))?,
+    };
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .map_err(|err| format!("failed to initialize tokio runtime: {err}"))?;
+    runtime
+        .block_on(mcp::serve_stdio(root))
+        .map_err(|err| err.to_string())
+}
+
+fn parse_optional_root_arg<I>(
+    mut args: I,
+    command: &str,
+    usage: &str,
+) -> Result<Option<PathBuf>, String>
+where
+    I: Iterator<Item = String>,
+{
+    let Some(first) = args.next() else {
+        return Ok(None);
+    };
+    if first != "--root" {
+        return Err(format!(
+            "unknown argument `{first}` for `draxl mcp {command}`\n\n{usage}"
+        ));
+    }
+    let Some(path) = args.next() else {
+        return Err(format!(
+            "missing value for `--root` in `draxl mcp {command}`\n\n{usage}"
+        ));
+    };
+    if let Some(extra) = args.next() {
+        return Err(format!(
+            "unexpected extra argument `{extra}` for `draxl mcp {command}`\n\n{usage}"
+        ));
+    }
+    Ok(Some(PathBuf::from(path)))
 }
 
 fn read_source(path: &PathBuf) -> Result<String, String> {
@@ -195,6 +262,17 @@ fn usage() -> String {
   draxl lower <file>
   draxl lower-rust <file>
   draxl patch [--in-place] <file> <patch-file>
-  draxl conflicts <file> <left-patch-file> <right-patch-file>"
+  draxl conflicts <file> <left-patch-file> <right-patch-file>
+  draxl mcp serve [--root <workspace>]
+  draxl mcp setup --client codex [--root <workspace>] [--print] [--force]"
         .to_owned()
+}
+
+fn mcp_usage() -> String {
+    format!(
+        "usage:
+  draxl mcp serve [--root <workspace>]
+  {}",
+        mcp_setup::setup_usage()
+    )
 }

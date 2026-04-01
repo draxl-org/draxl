@@ -33,7 +33,7 @@ pub(crate) fn resolve_dx_path(root: &Path, relative_path: &str) -> Result<PathBu
     let normalized = normalize_path(&root.join(relative_path));
     if !normalized.starts_with(root) {
         return Err(ToolError::new(
-            "path must stay inside the experiment workspace",
+            "path must stay inside the configured workspace",
         ));
     }
     if normalized.extension().and_then(|ext| ext.to_str()) != Some("dx")
@@ -359,41 +359,36 @@ fn collect_node_infos_inner(value: &Value, parent_id: Option<&str>, out: &mut Ve
 }
 
 fn summarize_node(map: &serde_json::Map<String, Value>) -> Option<String> {
-    if let Some(value) = map.get("name").and_then(Value::as_str) {
-        return Some(value.to_owned());
-    }
-    if let Some(value) = map.get("text").and_then(Value::as_str) {
-        return Some(value.to_owned());
-    }
-    if let Some(value) = map.get("op").and_then(Value::as_str) {
-        return Some(value.to_owned());
-    }
-    if let Some(value) = map
-        .get("value")
-        .and_then(Value::as_object)
-        .and_then(|value| value.get("value"))
-    {
-        return match value {
-            Value::String(text) => Some(text.clone()),
-            Value::Number(number) => Some(number.to_string()),
-            _ => None,
-        };
-    }
-    if let Some(segments) = map
-        .get("path")
-        .and_then(Value::as_object)
-        .and_then(|path| path.get("segments"))
-        .and_then(Value::as_array)
-    {
-        let segments = segments
-            .iter()
-            .filter_map(Value::as_str)
-            .collect::<Vec<_>>();
-        if !segments.is_empty() {
-            return Some(segments.join("::"));
+    let kind = map.get("kind").and_then(Value::as_str)?;
+    match kind {
+        "Fn" | "Mod" | "Struct" | "Enum" | "Variant" | "Field" | "Param" | "Ident" => {
+            map.get("name").and_then(Value::as_str).map(str::to_owned)
         }
+        "Doc" | "Comment" | "Lit" | "Path" => map.get("text").and_then(Value::as_str).map(|text| {
+            const LIMIT: usize = 32;
+            if text.len() <= LIMIT {
+                text.to_owned()
+            } else {
+                format!("{}...", &text[..LIMIT])
+            }
+        }),
+        "Binary" | "Unary" => map.get("op").and_then(Value::as_str).map(str::to_owned),
+        _ => None,
     }
-    None
+}
+
+fn parse_zero_arg_call_stmt(source: &str) -> Option<&str> {
+    let stripped = source.strip_suffix(';')?.trim_end();
+    let name = stripped.strip_suffix("()")?.trim();
+    (!name.is_empty() && is_plain_ident(name)).then_some(name)
+}
+
+fn is_plain_ident(value: &str) -> bool {
+    let mut chars = value.chars();
+    let first = chars
+        .next()
+        .filter(|ch| ch.is_ascii_alphabetic() || *ch == '_');
+    first.is_some() && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
 }
 
 fn allocate_ids(source: &str, prefixes: &[&str]) -> BTreeMap<String, String> {
@@ -439,31 +434,9 @@ fn allocate_ids(source: &str, prefixes: &[&str]) -> BTreeMap<String, String> {
     let mut allocated = BTreeMap::new();
     for prefix in prefixes {
         let next = max_by_prefix.get(*prefix).copied().unwrap_or(0) + 1;
-        max_by_prefix.insert((*prefix).to_owned(), next);
         allocated.insert((*prefix).to_owned(), format!("{prefix}{next}"));
     }
     allocated
-}
-
-fn parse_zero_arg_call_stmt(stmt_source: &str) -> Option<&str> {
-    let without_semi = stmt_source.trim().strip_suffix(';')?.trim_end();
-    let without_parens = without_semi.strip_suffix("()")?.trim_end();
-    if is_ident(without_parens) {
-        Some(without_parens)
-    } else {
-        None
-    }
-}
-
-fn is_ident(value: &str) -> bool {
-    let mut chars = value.chars();
-    let Some(first) = chars.next() else {
-        return false;
-    };
-    if !(first.is_ascii_alphabetic() || first == '_') {
-        return false;
-    }
-    chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
 }
 
 fn compare_ranks(left: &str, right: &str) -> Ordering {

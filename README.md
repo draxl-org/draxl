@@ -275,6 +275,8 @@ The current milestone supports:
   semicolon state
 - checking hard conflicts and the first semantic conflict class over pairs of
   patch streams through `draxl-merge` and the root facade
+- serving workspace-scoped Draxl edit tools over stdio MCP and generating
+  workspace-local Codex config through `draxl-agent` and `draxl-cli`
 
 ## Architecture
 
@@ -291,13 +293,15 @@ The current workspace is intentionally split by responsibility:
   attachments, and scalar paths
 - `draxl-merge`: merge analysis over patch streams, including hard conflicts
   and initial semantic conflict rules
-- `draxl-cli`: command-line entry point
+- `draxl-agent`: workspace-scoped agent edit backend and stdio MCP server
+- `draxl-cli`: command-line entry point and MCP/Codex setup wrapper
 
 ```text
 source text
   -> draxl-parser
   -> draxl-validate
-  -> draxl-printer / draxl-rust / draxl-patch
+  -> draxl-printer / draxl-rust / draxl-patch / draxl-merge
+  -> draxl-agent
   -> draxl facade and draxl CLI
 ```
 
@@ -351,6 +355,8 @@ cargo run -p draxl-cli -- dump-json examples/01_add.rs.dx
 cargo run -p draxl-cli -- validate examples/01_add.rs.dx
 cargo run -p draxl-cli -- lower-rust examples/01_add.rs.dx
 cargo run -p draxl-cli -- conflicts <file> <left-patch-file> <right-patch-file>
+cargo run -p draxl-cli -- mcp setup --client codex --root .
+cargo run -p draxl-cli -- mcp serve --root .
 ```
 
 ## License
