@@ -35,28 +35,6 @@ names the current language profile. That keeps the profile-specific surface
 distinct from the higher-level source model and leaves room for future profiles
 such as `.go.dx`, `.ts.dx`, and `.py.dx`.
 
-## What This Unlocks
-
-Draxl is more than a merge-friendly source format. Stable node IDs, ranks,
-anchors, and structured annotations create room for higher-level program control
-that ordinary text files do not represent cleanly.
-
-- **Node-level ownership and policy.** Functions, types, fields, match arms, and
-  statements can carry explicit owners, required reviewers, stability levels, or
-  security policy tags. Those rules stay attached to the syntax they govern
-  instead of living at file scope or drifting with line edits and refactors.
-
-- **Durable review, provenance, and audit state.** Approvals, benchmark results,
-  security findings, and agent provenance can attach to specific nodes and
-  survive surrounding changes that preserve identity. Tools can then invalidate
-  evidence precisely when the underlying semantic target changes.
-
-- **Machine-readable contracts and capability summaries.** Nodes can carry
-  structured annotations for effects, resource access, unsafe boundaries, API
-  guarantees, or other higher-level constraints. That gives agents and tooling a
-  durable substrate for reasoning that is stronger than comments and cheaper
-  than re-deriving intent from raw source.
-
 ## Example Draxl source
 
 ```text
@@ -95,6 +73,28 @@ The metadata prefix stays compact:
 
 Doc and line comments attach implicitly to the next semantic sibling when an
 explicit anchor is absent.
+
+## What This Unlocks
+
+Draxl is more than a merge-friendly source format. Stable node IDs, ranks,
+anchors, and structured annotations create room for higher-level program control
+that ordinary text files do not represent cleanly.
+
+- **Node-level ownership and policy.** Functions, types, fields, match arms, and
+  statements can carry explicit owners, required reviewers, stability levels, or
+  security policy tags. Those rules stay attached to the syntax they govern
+  instead of living at file scope or drifting with line edits and refactors.
+
+- **Durable review, provenance, and audit state.** Approvals, benchmark results,
+  security findings, and agent provenance can attach to specific nodes and
+  survive surrounding changes that preserve identity. Tools can then invalidate
+  evidence precisely when the underlying semantic target changes.
+
+- **Machine-readable contracts and capability summaries.** Nodes can carry
+  structured annotations for effects, resource access, unsafe boundaries, API
+  guarantees, or other higher-level constraints. That gives agents and tooling a
+  durable substrate for reasoning that is stronger than comments and cheaper
+  than re-deriving intent from raw source.
 
 ## Why now
 
