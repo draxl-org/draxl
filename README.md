@@ -1,41 +1,23 @@
 # Draxl
 
-Draxl is an agent-native source language for deterministic, high-volume
+Draxl is an agent-native source annotation layer for deterministic, high-volume
 concurrent code editing.
 
-It makes syntax identity, ordering, and attachment explicit in the source
-itself, so tools can apply semantic operators over stable nodes instead of
-patching text spans.
+It makes syntax identity and ordering explicit in the source itself.
 
-This repository contains the first Draxl language profile, which targets Rust
-through `.rs.dx` files and deterministic lowering to Rust.
-
-Under the hood, Draxl is AST-native: the source carries the structure,
-identity, and attachment data that replay, merge, audit, and lowering
-workflows need.
+Instead of patching text spans, code edits are semantic operations over
+stable node IDs:
 
 ```text
-agent edits
-  |
-  v
-semantic ops over stable ids
-  |
-  v
-validated Draxl
-  |
-  v
-canonical .rs.dx
-  |
-  v
-Rust
+insert @f1.body[ah]: @s3 let @p3 z = @e4 (@e6 y + @l2 1);
+
+replace @e3: @e5 z
 ```
 
-The `.rs.dx` extension is intentional. `.dx` names the Draxl layer and `.rs`
-names the current language profile. That keeps the profile-specific surface
-distinct from the higher-level source model and leaves room for future profiles
-such as `.go.dx`, `.ts.dx`, and `.py.dx`.
+## Example Draxl annotations
 
-## Example Draxl source
+Draxl annotation `.rs.dx` files lower deterministically to Rust. The annotation
+looks like this:
 
 ```text
 @m1 mod demo {
@@ -48,7 +30,7 @@ such as `.go.dx`, `.ts.dx`, and `.py.dx`.
 }
 ```
 
-The same file lowers deterministically to ordinary Rust:
+Lowered to Rust:
 
 ```rust
 mod demo {
@@ -61,7 +43,7 @@ mod demo {
 }
 ```
 
-The metadata prefix stays compact:
+How to read the markers:
 
 ```text
 @id[rank]->anchor
@@ -69,7 +51,7 @@ The metadata prefix stays compact:
 
 - `@id` gives the next supported node a stable identity
 - `[rank]` orders siblings inside ranked slots
-- `->anchor` attaches detached docs or comments to an existing sibling id
+- `->anchor` explicitly attaches detached docs or comments to an existing sibling id
 
 Doc and line comments attach implicitly to the next semantic sibling when an
 explicit anchor is absent.
