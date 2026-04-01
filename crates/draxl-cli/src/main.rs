@@ -180,6 +180,7 @@ fn run_mcp_serve(root: Option<PathBuf>) -> Result<(), String> {
             .map_err(|err| format!("failed to determine current directory: {err}"))?,
     };
     let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
         .build()
         .map_err(|err| format!("failed to initialize tokio runtime: {err}"))?;
     runtime
